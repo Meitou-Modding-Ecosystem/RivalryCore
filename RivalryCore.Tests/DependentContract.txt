@@ -1,0 +1,395 @@
+# Rivalry Core's dependent contract (.github/RELEASING.md), written by DependentContractTests. Do not edit by hand.
+minor 0.6
+Assessment : sealed class
+Assessment.CampaignFor(Int32 faction, CampaignKey key) : String
+Assessment.Data : PopulationData { get; }
+Assessment.Faction(Int32 faction) : FactionData
+Assessment.GameHours : Double { get; }
+Assessment.GrudgeAt(Int32 faction, RuleTarget target) : Single
+Assessment.HitSquadUnderway(Int32 faction) : Boolean
+Assessment.HoursSinceHitSquad(Int32 faction) : Double
+Assessment.IsAlly(Int32 faction) : Boolean
+Assessment.IsHostile(Int32 faction) : Boolean
+Assessment.KindOf(String behaviour) : PartyKind
+Assessment.MayStart(PartyKind kind, String source) : Boolean
+Assessment.Notoriety : NotorietyLedger { get; }
+Assessment.Options : RivalryOptions { get; }
+Assessment.OtherFactions() : IEnumerable<Int32>
+Assessment.PartiesOut(PartyKind kind) : Int32
+Assessment.PlayerFaction : Int32 { get; }
+Assessment.PositionOf(RuleTarget target) : Vector3?
+Assessment.Propose(HostileCandidate candidate, Action dispatch) : Void
+Assessment.Relation(Int32 faction) : Single
+Assessment.Report : PlayerReport { get; }
+Assessment.Rivals : RivalRoster { get; }
+Assessment.Roll(String key) : Single
+Assessment.SquadsNear(Int32 faction, CharacterId who) : Int32
+Assessment.TravelHours(Int32 faction, Vector3 to, String home = null) : Double
+Assessment.World : World { get; }
+BehaviourArgs : sealed class
+BehaviourArgs.Number(String name, Double fallback = 0) : Double
+BehaviourArgs.Numbers : SortedDictionary<String, Double> { get; }
+BehaviourArgs.Set(String name, Double value) : BehaviourArgs
+BehaviourArgs.Set(String name, String value) : BehaviourArgs
+BehaviourArgs.Text(String name) : String
+BehaviourArgs.Texts : SortedDictionary<String, String> { get; }
+BehaviourArgs.new()
+BehaviourContext : sealed class
+BehaviourContext.Apply(Decision decision) : String
+BehaviourContext.Begin(IBehaviour behaviour, BehaviourRequest request, Double until) : BehaviourRun
+BehaviourContext.Data : PopulationData { get; }
+BehaviourContext.Notoriety : NotorietyLedger { get; }
+BehaviourContext.Options : RivalryOptions { get; }
+BehaviourContext.Population : PopulationSystem { get; }
+BehaviourContext.Report : PlayerReport { get; }
+BehaviourContext.Rivals : RivalRoster { get; }
+BehaviourContext.Roll(String key) : Single
+BehaviourContext.System<T>() : T
+BehaviourContext.ValueOf(ItemInstance item) : Int64
+BehaviourContext.World : World { get; }
+BehaviourRequest : sealed class IEquatable<BehaviourRequest>
+BehaviourRequest.Args : BehaviourArgs { get; init; }
+BehaviourRequest.Source : String { get; init; }
+BehaviourRequest.Target : RuleTarget { get; init; }
+BehaviourRequest.new(String Source, RuleTarget Target, BehaviourArgs Args)
+BehaviourRun : sealed class
+BehaviourRun.Args : BehaviourArgs { get; init; }
+BehaviourRun.Behaviour : String { get; init; }
+BehaviourRun.Faction : Int32 { get; init; }
+BehaviourRun.Id : Int32 { get; init; }
+BehaviourRun.Key : String { get; init; }
+BehaviourRun.Phase : Int32 { get; set; }
+BehaviourRun.Platoon : Int32 { get; set; }
+BehaviourRun.Source : String { get; init; }
+BehaviourRun.Started : Double { get; init; }
+BehaviourRun.Town : Int32 { get; init; }
+BehaviourRun.Until : Double { get; set; }
+BehaviourRun.new()
+BuiltIn : static class
+BuiltIn.static const Burgle : String = rivalry.burgle
+BuiltIn.static const Calm : String = rivalry.calm
+BuiltIn.static const CharacterTarget : String = rivalry.character
+BuiltIn.static const HitSquadRule : String = rivalry.hit-squad
+BuiltIn.static const Hunt : String = rivalry.hunt
+BuiltIn.static const Losing : String = rivalry.losing
+BuiltIn.static const Pursue : String = rivalry.pursue
+BuiltIn.static const Raid : String = rivalry.raid
+BuiltIn.static const Reinforce : String = rivalry.reinforce
+BuiltIn.static const Tempting : String = rivalry.tempting
+BuiltIn.static const TownPublic : String = rivalry.town-public
+BuiltIn.static const TownTarget : String = rivalry.town
+BuiltIn.static const UnderAttack : String = rivalry.under-attack
+BuiltIn.static const Visit : String = rivalry.visit
+CampaignReport : sealed class IEquatable<CampaignReport>
+CampaignReport.CampaignId : String { get; init; }
+CampaignReport.Faction : Int32 { get; init; }
+CampaignReport.Hostile : Boolean { get; init; }
+CampaignReport.Phase : Int32 { get; init; }
+CampaignReport.Town : Int32 { get; init; }
+CampaignReport.new(Int32 Faction, String CampaignId, Int32 Town, Int32 Phase, Boolean Hostile)
+CharacterReport : sealed class IEquatable<CharacterReport>
+CharacterReport.CarriedValue : Int64 { get; init; }
+CharacterReport.Down : Boolean { get; init; }
+CharacterReport.GearValue : Int64 { get; init; }
+CharacterReport.Id : CharacterId { get; init; }
+CharacterReport.InCombat : Boolean { get; init; }
+CharacterReport.Name : String { get; init; }
+CharacterReport.Position : Vector3 { get; init; }
+CharacterReport.Squad : Int32 { get; init; }
+CharacterReport.Strength : Single { get; init; }
+CharacterReport.Town : Int32 { get; init; }
+CharacterReport.Value(String probe) : Double
+CharacterReport.Values : IReadOnlyDictionary<String, Double> { get; init; }
+CharacterReport.new(CharacterId Id, String Name, Int32 Squad, Vector3 Position, Int32 Town, Boolean Down, Boolean InCombat, Single Strength, Int64 GearValue, Int64 CarriedValue)
+Decision : abstract class IEquatable<Decision>
+Decision.Director : String { get; init; }
+Decisions : sealed class
+Decisions.Cooling(String key) : Boolean
+Decisions.Custom(String label, Action<World> apply) : Void
+Decisions.Direct(Int32 squad, String package, Single hours, CharacterId? target = null) : Void
+Decisions.Director : String { get; }
+Decisions.Grudge(Int32 faction, CharacterId who, Single delta) : Void
+Decisions.Hunt(Int32 faction, CharacterId target, Int32 squads = 1, String package = null, Single hours = 24) : Void
+Decisions.Notice(String message) : Void
+Decisions.Raid(Int32 faction, Int32 town, String campaignId = null, Single delayHours = 0) : Void
+Decisions.Reinforce(Int32 faction, Int32 town, String campaignId = null, Single delayHours = 0, Boolean nearby = True) : Void
+Decisions.ShiftRelation(Int32 faction, Single delta) : Void
+Decisions.Start(String behaviour, RuleTarget target, BehaviourArgs args = null) : Void
+Decisions.TryClaim(String key, Double hours) : Boolean
+GrudgeKey : struct IComparable<GrudgeKey>, IEquatable<GrudgeKey>
+GrudgeKey.CompareTo(GrudgeKey other) : Int32
+GrudgeKey.Faction : Int32 { get; init; }
+GrudgeKey.Who : CharacterId { get; init; }
+GrudgeKey.new(Int32 Faction, CharacterId Who)
+HostileCandidate : sealed class IEquatable<HostileCandidate>
+HostileCandidate.ClaimHours : Double { get; init; }
+HostileCandidate.Faction : Int32 { get; init; }
+HostileCandidate.Grudge : Single { get; init; }
+HostileCandidate.Id : String { get; }
+HostileCandidate.Key : String { get; init; }
+HostileCandidate.Source : String { get; init; }
+HostileCandidate.TravelHours : Double { get; init; }
+HostileCandidate.new(String Source, String Key, Int32 Faction, Single Grudge, Double TravelHours, Double ClaimHours = 6)
+IBehaviour : interface
+IBehaviour.Party : PartyKind { get; }
+IBehaviour.Step(BehaviourContext context, BehaviourRun run) : Boolean
+IBehaviour.Underway(BehaviourRun run) : Boolean
+IBehaviour.abstract Name : String { get; }
+IBehaviour.abstract Start(BehaviourContext context, BehaviourRequest request) : String
+IDirector : interface
+IDirector.abstract Assess(Assessment assessment, Decisions decisions) : Void
+IDirector.abstract Name : String { get; }
+IRivalryApi : interface
+IRivalryApi.abstract For(String modId) : IRivalryRegistry
+IRivalryApi.abstract In(World world) : IRivalryState
+IRivalryApi.abstract Options : RivalryOptions { get; }
+IRivalryRegistry : interface
+IRivalryRegistry.abstract AddBehaviour(IBehaviour behaviour) : Void
+IRivalryRegistry.abstract AddCharacterProbe(String name, Func<World, CharacterReport, Double> read) : Void
+IRivalryRegistry.abstract AddCondition(String name, Func<Assessment, RuleTarget, Boolean> test) : Void
+IRivalryRegistry.abstract AddDirector(IDirector director) : Void
+IRivalryRegistry.abstract AddRule(Rule rule) : Void
+IRivalryRegistry.abstract AddTarget(String name, Func<Assessment, IEnumerable<RuleTarget>> list) : Void
+IRivalryRegistry.abstract AddTownProbe(String name, Func<World, TownReport, Double> read) : Void
+IRivalryRegistry.abstract ExceedHostileCap(String source, Int32 extra, String reason) : Void
+IRivalryState : interface
+IRivalryState.abstract ClaimParty(PartyClaim claim) : Boolean
+IRivalryState.abstract History : IReadOnlyList<String> { get; }
+IRivalryState.abstract HostileRestUntil : Double { get; }
+IRivalryState.abstract Notoriety : NotorietyLedger { get; }
+IRivalryState.abstract Parties : IReadOnlyList<PartyView> { get; }
+IRivalryState.abstract PartiesOut(PartyKind kind) : Int32
+IRivalryState.abstract PartyCap(PartyKind kind) : Int32
+IRivalryState.abstract Propose(HostileCandidate candidate) : Boolean
+IRivalryState.abstract ReleaseParty(String source, String key) : Boolean
+IRivalryState.abstract Report : PlayerReport { get; }
+IRivalryState.abstract Rivals : RivalRoster { get; }
+IRivalryState.abstract Runs : IReadOnlyList<String> { get; }
+IRivalryState.abstract TravelHours(Int32 faction, CharacterId target) : Double
+IRivalryState.abstract Waiting : IReadOnlyList<WaitingView> { get; }
+NotorietyLedger : sealed class
+NotorietyLedger.Add(Int32 faction, CharacterId who, Single delta) : Void
+NotorietyLedger.Clear() : Void
+NotorietyLedger.ClearFaction(Int32 faction) : Single
+NotorietyLedger.Cool(CharacterTable table, Double hours, Double perHour) : Void
+NotorietyLedger.Count : Int32 { get; }
+NotorietyLedger.Entries : IEnumerable<KeyValuePair<GrudgeKey, Single>> { get; }
+NotorietyLedger.Floors : IEnumerable<KeyValuePair<GrudgeKey, Single>> { get; }
+NotorietyLedger.Grudge(Int32 faction, CharacterId who) : Single
+NotorietyLedger.Hash(ref StateHasher h) : Void
+NotorietyLedger.HeldFloor(Int32 faction, CharacterId who) : Single
+NotorietyLedger.HoldFloor(Int32 faction, CharacterId who, Single floor) : Void
+NotorietyLedger.Notoriety(CharacterId who) : Single
+NotorietyLedger.ReleaseFloor(Int32 faction, CharacterId who) : Void
+NotorietyLedger.ReleaseFloors(Int32 faction) : Void
+NotorietyLedger.Started : Int32 { get; }
+NotorietyLedger.new()
+NotorietyLedger.static const Floor : Single = 0.5
+PartyClaim : sealed class IEquatable<PartyClaim>
+PartyClaim.Faction : Int32 { get; init; }
+PartyClaim.Hours : Double { get; init; }
+PartyClaim.Key : String { get; init; }
+PartyClaim.Kind : PartyKind { get; init; }
+PartyClaim.Source : String { get; init; }
+PartyClaim.new(String Source, PartyKind Kind, String Key, Double Hours, Int32 Faction = -1)
+PartyKind : enum Int32
+PartyKind.Friendly = 2
+PartyKind.Hostile = 1
+PartyKind.None = 0
+PartyView : sealed class IEquatable<PartyView>
+PartyView.Faction : Int32 { get; init; }
+PartyView.Key : String { get; init; }
+PartyView.Kind : PartyKind { get; init; }
+PartyView.Run : Int32 { get; init; }
+PartyView.Source : String { get; init; }
+PartyView.What : String { get; init; }
+PartyView.new(PartyKind Kind, String Source, String What, String Key, Int32 Faction, Int32 Run)
+PlayerReport : sealed class IEquatable<PlayerReport>
+PlayerReport.Built : Int64 { get; }
+PlayerReport.Campaigns : IReadOnlyList<CampaignReport> { get; init; }
+PlayerReport.Carried : Int64 { get; }
+PlayerReport.Characters : IReadOnlyList<CharacterReport> { get; init; }
+PlayerReport.Find(CharacterId id) : CharacterReport
+PlayerReport.GameHours : Double { get; init; }
+PlayerReport.Money : Int64 { get; init; }
+PlayerReport.PlayerFaction : Int32 { get; init; }
+PlayerReport.Stored : Int64 { get; }
+PlayerReport.Strongest : CharacterReport { get; }
+PlayerReport.Tick : Int64 { get; init; }
+PlayerReport.TownOf(Int32 number) : TownReport
+PlayerReport.Towns : IReadOnlyList<TownReport> { get; init; }
+PlayerReport.Wealth : Int64 { get; }
+PlayerReport.new(Int64 Tick, Double GameHours, Int32 PlayerFaction, Int64 Money, IReadOnlyList<CharacterReport> Characters, IReadOnlyList<TownReport> Towns, IReadOnlyList<CampaignReport> Campaigns)
+PlayerReport.static readonly Empty : PlayerReport
+Reckoning : sealed class IEquatable<Reckoning>
+Reckoning.Faction : String { get; init; }
+Reckoning.GrudgeCleared : Single { get; init; }
+Reckoning.Hour : Double { get; init; }
+Reckoning.Leader : String { get; init; }
+Reckoning.Quarry : String { get; init; }
+Reckoning.new(String Faction, String Leader, String Quarry, Double Hour, Single GrudgeCleared)
+RivalFate : enum Int32
+RivalFate.Captive = 1
+RivalFate.Dead = 2
+RivalFate.Free = 0
+RivalFate.Jailed = 3
+RivalFate.Recruited = 4
+RivalLeader : sealed class
+RivalLeader.Busy : Boolean { get; set; }
+RivalLeader.Captures : Int32 { get; set; }
+RivalLeader.ComradesLost : Int32 { get; set; }
+RivalLeader.Dispatches : Int32 { get; set; }
+RivalLeader.Escapes : Int32 { get; set; }
+RivalLeader.Faction : String { get; init; }
+RivalLeader.Fate : RivalFate { get; set; }
+RivalLeader.LastComradesLost : Int32 { get; set; }
+RivalLeader.LastHour : Double { get; set; }
+RivalLeader.LastOutcome : RivalOutcome { get; set; }
+RivalLeader.LastQuarry : String { get; set; }
+RivalLeader.LeftForDead : Int32 { get; set; }
+RivalLeader.Losses : Int32 { get; set; }
+RivalLeader.Name : String { get; init; }
+RivalLeader.Remembered : RivalOutcome { get; }
+RivalLeader.Serial : UInt32 { get; set; }
+RivalLeader.Wins : Int32 { get; set; }
+RivalLeader.Withdrawals : Int32 { get; set; }
+RivalLeader.new()
+RivalOutcome : enum Int32
+RivalOutcome.Beaten = 3
+RivalOutcome.Captured = 5
+RivalOutcome.Escaped = 6
+RivalOutcome.Killed = 7
+RivalOutcome.LeftForDead = 4
+RivalOutcome.None = 0
+RivalOutcome.Recruited = 9
+RivalOutcome.TurnedIn = 8
+RivalOutcome.Withdrew = 2
+RivalOutcome.Won = 1
+RivalRoster : sealed class
+RivalRoster.Clear() : Void
+RivalRoster.Describe() : IEnumerable<String>
+RivalRoster.Ended(String faction, Double hour) : Void
+RivalRoster.Find(String faction, String name) : RivalLeader
+RivalRoster.Hash(ref StateHasher h) : Void
+RivalRoster.HoursSinceEnded(String faction, Double now) : Double
+RivalRoster.Idle(IEnumerable<ValueTuple<String, String>> onRuns) : Void
+RivalRoster.LastReckoning(String faction) : Reckoning
+RivalRoster.Leaders : IReadOnlyList<RivalLeader> { get; }
+RivalRoster.Pick(String faction, IReadOnlyList<String> names, Single roll, Func<UInt32, Boolean> standing) : RivalLeader
+RivalRoster.Read(BinaryReader r) : Void
+RivalRoster.Reckon(Reckoning reckoning) : Void
+RivalRoster.Reckonings : IReadOnlyList<Reckoning> { get; }
+RivalRoster.Write(BinaryWriter w) : Void
+RivalRoster.new()
+RivalryMod : sealed class IMod, IModDependents, IRivalryApi
+RivalryMod.DependentFailed(String modId) : Void
+RivalryMod.For(String modId) : IRivalryRegistry
+RivalryMod.In(World world) : IRivalryState
+RivalryMod.Initialize(ModContext c) : Void
+RivalryMod.Options : RivalryOptions { get; }
+RivalryMod.new()
+RivalryMod.static const GrudgeCondition : Int32 = 1600
+RivalryMod.static const GrudgeEffect : Int32 = 1600
+RivalryMod.static const Id : String = rivalry.core
+RivalryMod.static const NotorietyCondition : Int32 = 1601
+RivalryOptions : sealed class
+RivalryOptions.AftermathHours : Double { get; set; }
+RivalryOptions.Announce : Boolean { get; set; }
+RivalryOptions.AssessEveryHours : Int32 { get; set; }
+RivalryOptions.BarkCooldownSeconds : Single { get; set; }
+RivalryOptions.Copy() : RivalryOptions
+RivalryOptions.DefendPackage : String { get; set; }
+RivalryOptions.DownedHitGrudge : Single { get; set; }
+RivalryOptions.FriendlyPartiesAtOnce : Int32 { get; set; }
+RivalryOptions.GrudgeCandidatesPerAssessment : Int32 { get; set; }
+RivalryOptions.GrudgeCoolPerHour : Double { get; set; }
+RivalryOptions.HitGrudge : Single { get; set; }
+RivalryOptions.HitSquadRestHours : Double { get; set; }
+RivalryOptions.HitSquads : Boolean { get; set; }
+RivalryOptions.Homes : Dictionary<String, String> { get; }
+RivalryOptions.HuntCooldownHours : Double { get; set; }
+RivalryOptions.HuntHours : Single { get; set; }
+RivalryOptions.HuntPackage : String { get; set; }
+RivalryOptions.HuntRadius : Single { get; set; }
+RivalryOptions.HuntRestMaxHours : Int32 { get; set; }
+RivalryOptions.HuntRestMinHours : Int32 { get; set; }
+RivalryOptions.HuntSpawnMaxRadius : Single { get; set; }
+RivalryOptions.HuntSpawnMinRadius : Single { get; set; }
+RivalryOptions.HuntSquads : Int32 { get; set; }
+RivalryOptions.HuntThreshold : Single { get; set; }
+RivalryOptions.HuntTravelFallbackHours : Double { get; set; }
+RivalryOptions.HuntTravelMaxHours : Double { get; set; }
+RivalryOptions.HuntTravelMinHours : Double { get; set; }
+RivalryOptions.HuntTravelUnitsPerHour : Double { get; set; }
+RivalryOptions.HuntTravelWeight : Single { get; set; }
+RivalryOptions.HuntWaitWeight : Single { get; set; }
+RivalryOptions.HunterBarks : Boolean { get; set; }
+RivalryOptions.Hunters : Boolean { get; set; }
+RivalryOptions.KillGrudge : Single { get; set; }
+RivalryOptions.KillWindowHours : Double { get; set; }
+RivalryOptions.MaxHuntsPerAssessment : Int32 { get; set; }
+RivalryOptions.OffTargetLine : String { get; set; }
+RivalryOptions.OpportunistRaids : Boolean { get; set; }
+RivalryOptions.OwnHitSquads : HashSet<String> { get; }
+RivalryOptions.RaidChancePerDay : Single { get; set; }
+RivalryOptions.RaidCooldownHours : Double { get; set; }
+RivalryOptions.RaidValuePerDefence : Single { get; set; }
+RivalryOptions.RaidWealthMin : Int64 { get; set; }
+RivalryOptions.ReinforceBelowBalance : Single { get; set; }
+RivalryOptions.ReinforceCooldownHours : Double { get; set; }
+RivalryOptions.ReinforceHours : Single { get; set; }
+RivalryOptions.ReinforceRadius : Single { get; set; }
+RivalryOptions.Reinforcements : Boolean { get; set; }
+RivalryOptions.SeenRange : Single { get; set; }
+RivalryOptions.UseTownSquads : Boolean { get; set; }
+RivalryOptions.new()
+Rule : sealed class
+Rule.Args : Func<Assessment, RuleTarget, BehaviourArgs> { get; init; }
+Rule.Behaviour : String { get; init; }
+Rule.ChancePerDay : Func<RivalryOptions, Single> { get; init; }
+Rule.Conditions : IReadOnlyList<String> { get; init; }
+Rule.CooldownHours : Func<RivalryOptions, Double> { get; init; }
+Rule.Enabled : Func<RivalryOptions, Boolean> { get; init; }
+Rule.Faction : Func<Assessment, RuleTarget, Int32> { get; init; }
+Rule.Grudge : Func<Assessment, RuleTarget, Single> { get; init; }
+Rule.Name : String { get; init; }
+Rule.Notice : Func<Assessment, RuleTarget, String> { get; init; }
+Rule.Target : String { get; init; }
+Rule.When : Func<Assessment, RuleTarget, Boolean> { get; init; }
+Rule.new()
+RuleTarget : sealed class IEquatable<RuleTarget>
+RuleTarget.Character : CharacterId { get; init; }
+RuleTarget.Faction : Int32 { get; init; }
+RuleTarget.Key : String { get; init; }
+RuleTarget.Site : String { get; init; }
+RuleTarget.Town : Int32 { get; init; }
+RuleTarget.new(String Key)
+TownReport : sealed class IEquatable<TownReport>
+TownReport.Balance : Single { get; }
+TownReport.Beds : Int32 { get; init; }
+TownReport.BuildingValue : Int64 { get; init; }
+TownReport.Buildings : Int32 { get; init; }
+TownReport.Defence : Single { get; init; }
+TownReport.Defenders : IReadOnlyList<CharacterId> { get; init; }
+TownReport.DefendersDown : Int32 { get; init; }
+TownReport.Gates : Int32 { get; init; }
+TownReport.Hostiles : IReadOnlyList<CharacterId> { get; init; }
+TownReport.Name : String { get; init; }
+TownReport.Number : Int32 { get; init; }
+TownReport.Position : Vector3 { get; init; }
+TownReport.Public : Boolean { get; init; }
+TownReport.Radius : Single { get; init; }
+TownReport.ResearchLevel : Int32 { get; init; }
+TownReport.StoredValue : Int64 { get; init; }
+TownReport.Threat : Single { get; init; }
+TownReport.Turrets : Int32 { get; init; }
+TownReport.UnderAttack : Boolean { get; }
+TownReport.Value(String probe) : Double
+TownReport.Values : IReadOnlyDictionary<String, Double> { get; init; }
+TownReport.new(Int32 Number, String Name, Vector3 Position, Single Radius, Int32 Buildings, Int32 Turrets, Int32 Gates, Int32 ResearchLevel, Int64 StoredValue, IReadOnlyList<CharacterId> Defenders, Int32 DefendersDown, Single Defence, IReadOnlyList<CharacterId> Hostiles, Single Threat)
+WaitingView : sealed class IEquatable<WaitingView>
+WaitingView.Key : String { get; init; }
+WaitingView.Score : Double { get; init; }
+WaitingView.Source : String { get; init; }
+WaitingView.Waited : Double { get; init; }
+WaitingView.new(String Source, String Key, Double Score, Double Waited)
