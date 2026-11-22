@@ -47,6 +47,38 @@ them). Dustlife reads the others through their public APIs and never sends hunte
 A place held by a faction the simulation does not run (a boss hideout) is locked: never a target. On the base game plus several large world
 mods this makes 420 places (38 bases, 119 resource points, 263 territories, 145 locked) and 64 factions.
 
+## The place graph (nodes and edges)
+
+Dustlife doesn't build a graph of its own: it reads Logistics Core's (#59). Today a place in the simulation is only a point: bands walk to a
+target in a straight line, and a base scores targets by priority over straight-line distance squared, so a town across a mountain range
+counts as near. Logistics Core fixes that for every mod at once:
+- **Nodes:** every placed town, `town:<InstanceId>`, with its owner and the owners its town versions allow (vanilla node seeding,
+  Meitou-Modding-Ecosystem/LogisticsCore `docs/vanilla-nodes.md`).
+- **Edges:** which places the game's own roads join, and the length walked (vanilla edge seeding, Meitou-Modding-Ecosystem/LogisticsCore#5,
+  `docs/vanilla-edges.md`). A route through a third town is two edges, places within the game's straight-walk distance are near edges, and
+  islands no road reaches join the rest overland. On the base game: 226 ownable places, 618 edges, one connected graph.
+
+Dustlife's part is what the edges **mean** for the war, as rules it registers on top of that graph:
+
+| Use | Rule |
+| --- | --- |
+| Targets | A base scores targets by **road distance** (the sum of edge costs), not straight-line distance. |
+| Fronts | The front is the set of edges whose two ends are held by factions at war. The Bast Front is then computed, not drawn: the contested edges round Okran's Shield and Stack. |
+| Supply | Caravans travel along edges between a faction's places. An edge held by an enemy band, or a caravan raided on it, is **cut**: stock stops reaching the place at the far end (the economy's "cut road", #46). |
+| Sieges | A place is **cut off** when every edge to a friendly place is cut. A cut-off place gets no supply and no relief bands. |
+| Chokepoints | A place with few edges that joins two parts of a faction's graph is a natural strongpoint: targets can weigh it higher. The Hub is one: the only node between Stack and Squin (#90). |
+| News | "The road from X to Y is cut" and "Z is cut off" are events for The Wasteland Remembers to tell. |
+
+Anything that changes what an edge costs (danger, tolls, a hostile player base on the road, #90) goes into Logistics Core's edge costs
+as a policy, so caravans of every mod see the same roads.
+
+How it is checked (each rule logs when it fires and is counted, as every Dustlife rule):
+- **Behaviour, balance runner:** with road distance, invasions follow roads and no band targets a place across impassable ground; a cut
+  edge lowers the far place's stock within the next supply step. Falsified if the front and capture counts don't change between straight
+  and road distance (then the graph adds nothing), or if cut places never starve.
+- **The graph itself** is Logistics Core's to check (its tests: a route through a third town is two edges, islands join the rest, the
+  result doesn't depend on input order).
+
 ## War rules (today)
 
 - **Seeding:** 2 garrison bands per base, 1 per resource point.
@@ -144,5 +176,6 @@ One PR each, into `beta`:
 1. This document, a README row and a CODEOWNERS line; the mod skeleton (`meitou.json`, empty system).
 2. The core world (places, factions, bands, time, combat) and Warfare's garrisons and resources, on synthetic-world tests.
 3. The balance runner and its fixtures from the C++ reference.
-4. Bands as real platoons through the world hooks.
-5. The economy rules, one at a time, each with its falsifier.
+4. On Logistics Core's graph: targets by road distance, fronts and cut roads.
+5. Bands as real platoons through the world hooks.
+6. The economy rules, one at a time, each with its falsifier.

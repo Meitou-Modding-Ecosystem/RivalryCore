@@ -1,6 +1,6 @@
 # The Wasteland Remembers (companion mod)
 
-**Status: released on the Steam Workshop (build 20261115ai); the API below is in build 20261115aj and later (version 2, news, from 20261116ak; version 3 from 20261116ap, not on Steam yet). Not in this repo:** its source lives in its author's own repo
+**Status: released on the Steam Workshop (build 20261115ai); the API below is in build 20261115aj and later (version 2, news, from 20261116ak; version 3 from 20261116ap, version 4 from 20261117at; not on Steam yet). Not in this repo:** its source lives in its author's own repo
 ([Meitou-Modding-Ecosystem/TheWastelandRemembers](https://github.com/Meitou-Modding-Ecosystem/TheWastelandRemembers); the newest build is in its open PR);
 this page and [wasteland-remembers-api.md](wasteland-remembers-api.md) are what other mods need to work alongside it. Owner: @aaallleeeccc.
 
@@ -8,7 +8,8 @@ The Wasteland Remembers (TWR) is a Meitou-only Kenshi mod: a world that notices 
 here don't do it twice), how to talk to it, what is planned for working together, and what its play tests taught about Meitou's engine.
 
 - Steam Workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=3839368189
-- Supports MeitouClient 0.17.3 up to (not including) 0.21.0. Played on 0.20.0; builds and loads checked on 0.17.3 to v0.20.2-nightly.20261116.2.
+- Supports MeitouClient 0.17.3 up to (not including) 0.22.0 (Meitou 0.21 support from build 20261117ar and the Steam hotfix 20261117ai2).
+  Played on 0.20.0; builds and loads checked on 0.17.3 to 0.21.0.
 - The API is in build 20261115aj and later; version 2 (`Report`, news from other mods) from 20261116ak; version 3 (`SendHunters`,
   `LeaveAlone`) from 20261116ap.
 
@@ -26,7 +27,7 @@ here don't do it twice), how to talk to it, what is planned for working together
 | Squad record | Kills by faction, titles from deeds (75), history, the fallen, a Recap link. | Titles are readable through the API. |
 | Economy | Only alms, contract pay and bounties. No production, supply or garrisons. | Free ground for an economy mod. |
 
-## Talking to TWR: the API (version 3)
+## Talking to TWR: the API (version 4)
 
 A public static class, `LivingWasteland.MeitouMod.WastelandApi`, read by reflection so no mod depends on TWR. Full reference:
 [wasteland-remembers-api.md](wasteland-remembers-api.md). In short:
@@ -36,6 +37,7 @@ A public static class, `LivingWasteland.MeitouMod.WastelandApi`, read by reflect
 - The squad's story: `SquadTitles()`, `Note(text)` (History tab), `Moment(caption, place, weight)` (BeatTheCount's Recap)
 - News (version 2): `Report(kind, place, faction, text, weight, source)`: towns near the place talk about it; see #23
 - Version 3: `SendHunters(town, reason)` (a crew now, #26) and `LeaveAlone(name, faction, source)` (your named characters never become TWR rivals, #25)
+- Version 4: `Outlaws()`, `OutlawAt(x, z)`, `HideoutStruck(name, by, bloodied, source)` (TWR's outlaws for the war layer, #59) and `TownNode(town)` (`town:<InstanceId>`)
 
 Plain types only (strings, numbers, bools, lists of string-keyed dictionaries). Nothing throws; before a game loads, reads come back empty and
 writes return false. `Version` only grows; nothing is removed or changes meaning.

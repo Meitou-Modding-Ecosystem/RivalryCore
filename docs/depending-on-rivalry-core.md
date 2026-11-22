@@ -9,7 +9,8 @@ walks through the same steps: [.claude/skills/rivalry-core-dependent](../.claude
 
 | Source | Use it for | Where |
 | --- | --- | --- |
-| Commit-pinned source | building against current `beta` before any release | this repo as a git submodule of yours (`deps/MeitouMods`), pinned to a commit |
+| Framework lock (recommended) | a mod repo of the org: builds and tests against a release, moved automatically on new ones | `meitou.lock.json` naming a release or beta zip; see below |
+| Commit-pinned source | building against current `beta` before any release | this repo as a git submodule of yours (`deps/RivalryCore`), pinned to a commit |
 | Beta zip | testers' installs; a DLL to compile against without a submodule | prereleases `rivalry-core-<version>-beta.<commit>` (one per beta commit that changes the framework, never moved) and `rivalry-core-beta` (always the newest) |
 | Release zip | published mods | releases `rivalry-core-v<version>`, tagged on `release` |
 
@@ -18,25 +19,29 @@ In every case:
 - Reference Rivalry Core with `Private="false"`, and never list `RivalryCore.dll` in your own `assemblies`: the loader refuses the mod. A
   stray copy in your folder is ignored; the loaded `rivalry.core` serves the types, so every dependent shares one framework, one grudge
   ledger and one set of party caps.
-- Build against the same engine commit Rivalry Core was built against: the `engine/` pin of the MeitouMods commit, which every zip's
+- Build against the same engine commit Rivalry Core was built against: the `engine/` pin of the RivalryCore commit, which every zip's
   release notes name.
 - The version lives only in `RivalryCore/meitou.json`; the DLL takes it at build time. A beta zip carries the manifest's version, so your
   `dependencies` range accepts it, but later beta builds can carry the same version: pin the tag, not the version.
 
-### In this repo
+### Framework lock
 
-`<ProjectReference Include="../RivalryCore/RivalryCore.csproj" Private="false" />`, beside the engine references (see
-`AshenHand/AshenHand.csproj`).
+A repo made from [MeitouModTemplate](https://github.com/Meitou-Modding-Ecosystem/MeitouModTemplate) names Rivalry Core's zip in
+`meitou.lock.json` (tag, asset, SHA-256 and engine commit from the release notes); the build downloads, checks and references it, Play
+deploys it, and a scheduled workflow moves the lock to new releases. Setup: GutenStructure
+[framework lock](https://github.com/TheIvoryDisaster/GutenStructure/blob/beta/docs/framework-lock.md) and
+[framework update](https://github.com/TheIvoryDisaster/GutenStructure/blob/beta/docs/framework-update.md). Working example:
+[AshenHand](https://github.com/Meitou-Modding-Ecosystem/AshenHand).
 
 ### Commit-pinned source
 
 **In your mod repo's root:**
 
 ```sh
-git submodule add https://github.com/Meitou-Modding-Ecosystem/MeitouMods.git deps/MeitouMods
-git -C deps/MeitouMods checkout --detach <commit on beta>
+git submodule add https://github.com/Meitou-Modding-Ecosystem/RivalryCore.git deps/RivalryCore
+git -C deps/RivalryCore checkout --detach <commit on beta>
 git submodule update --init --recursive
-git add .gitmodules deps/MeitouMods
+git add .gitmodules deps/RivalryCore
 git commit -m "Pin Rivalry Core to <commit on beta>"
 ```
 
@@ -45,42 +50,47 @@ against one engine:
 
 ```xml
 <ItemGroup>
-  <ProjectReference Include="../deps/MeitouMods/engine/src/Meitou.Core/Meitou.Core.csproj" Private="false" />
-  <ProjectReference Include="../deps/MeitouMods/engine/src/Meitou.Data/Meitou.Data.csproj" Private="false" />
-  <ProjectReference Include="../deps/MeitouMods/engine/src/Meitou.Simulation/Meitou.Simulation.csproj" Private="false" />
-  <ProjectReference Include="../deps/MeitouMods/engine/src/Meitou.Game/Meitou.Game.csproj" Private="false" />
-  <ProjectReference Include="../deps/MeitouMods/RivalryCore/RivalryCore.csproj" Private="false" />
+  <ProjectReference Include="../deps/RivalryCore/engine/src/Meitou.Core/Meitou.Core.csproj" Private="false" />
+  <ProjectReference Include="../deps/RivalryCore/engine/src/Meitou.Data/Meitou.Data.csproj" Private="false" />
+  <ProjectReference Include="../deps/RivalryCore/engine/src/Meitou.Simulation/Meitou.Simulation.csproj" Private="false" />
+  <ProjectReference Include="../deps/RivalryCore/engine/src/Meitou.Game/Meitou.Game.csproj" Private="false" />
+  <ProjectReference Include="../deps/RivalryCore/RivalryCore/RivalryCore.csproj" Private="false" />
 </ItemGroup>
 ```
 
-Import `deps/MeitouMods/engine/Directory.Build.props` from your own `Directory.Build.props`, so your mod builds with the engine's settings.
+Import `deps/RivalryCore/engine/Directory.Build.props` from your own `Directory.Build.props`, so your mod builds with the engine's settings.
+
+Stamp the engine as the oldest game release your mod supports, or the released game refuses your DLL (the submodule builds the engine as
+`1.0.0.0`, and .NET never binds to an older assembly): a `Directory.Build.rsp` in your repo's root holding `-p:AssemblyVersion=0.22.0.0`,
+and the same range in your `gameVersion`. Copy Rivalry Core's `Directory.Build.props` lines if your own assembly should keep its manifest
+version.
 
 To install the pinned Rivalry Core for play, download the beta zip of that commit if it has one; otherwise, **in your mod repo's root**:
 
 ```sh
-dotnet publish deps/MeitouMods/RivalryCore -c Release -o "<Kenshi>/mods/RivalryCore"
-dotnet run --project deps/MeitouMods/tools/EmptyMod -c Release -- "<Kenshi>/mods/RivalryCore/RivalryCore.mod"
+dotnet publish deps/RivalryCore/RivalryCore -c Release -o "<Kenshi>/mods/RivalryCore"
+dotnet run --project deps/RivalryCore/tools/EmptyMod -c Release -- "<Kenshi>/mods/RivalryCore/RivalryCore.mod"
 ```
 
 To move the pin, **in your mod repo's root**:
 
 ```sh
-git -C deps/MeitouMods fetch origin beta
-git -C deps/MeitouMods checkout --detach <new commit>
+git -C deps/RivalryCore fetch origin beta
+git -C deps/RivalryCore checkout --detach <new commit>
 git submodule update --init --recursive
 git commit -am "Move Rivalry Core to <new commit>"
 ```
 
 ### Zip
 
-Versioned releases hold the zip, its `.sha256` file, and notes naming the MeitouMods commit, the engine commit and the zip's SHA-256. The zip holds
+Versioned releases hold the zip, its `.sha256` file, and notes naming the RivalryCore commit, the engine commit and the zip's SHA-256. The zip holds
 the `RivalryCore/` folder (`RivalryCore.dll`, `RivalryCore.pdb`, `meitou.json` and an empty `RivalryCore.mod`).
 
 | Zip | Download |
 | --- | --- |
-| Newest beta | `https://github.com/Meitou-Modding-Ecosystem/MeitouMods/releases/download/rivalry-core-beta/RivalryCore-beta.zip` |
-| One beta build | `https://github.com/Meitou-Modding-Ecosystem/MeitouMods/releases/download/rivalry-core-<version>-beta.<commit>/RivalryCore-<version>-beta.<commit>.zip` |
-| Release | `https://github.com/Meitou-Modding-Ecosystem/MeitouMods/releases/download/rivalry-core-v<version>/RivalryCore-<version>.zip` |
+| Newest beta | `https://github.com/Meitou-Modding-Ecosystem/RivalryCore/releases/download/rivalry-core-beta/RivalryCore-beta.zip` |
+| One beta build | `https://github.com/Meitou-Modding-Ecosystem/RivalryCore/releases/download/rivalry-core-<version>-beta.<commit>/RivalryCore-<version>-beta.<commit>.zip` |
+| Release | `https://github.com/Meitou-Modding-Ecosystem/RivalryCore/releases/download/rivalry-core-v<version>/RivalryCore-<version>.zip` |
 
 - To play: extract the zip into `Kenshi/mods/`, so the files sit in `Kenshi/mods/RivalryCore/`, and enable Rivalry Core above your mod.
 - To compile against it: copy `RivalryCore.dll` from the zip to `lib/RivalryCore.dll` in your mod repo, and in your mod's `.csproj`
@@ -89,7 +99,7 @@ the `RivalryCore/` folder (`RivalryCore.dll`, `RivalryCore.pdb`, `meitou.json` a
 - To fetch it in CI: pin the tag and the SHA-256 from the release notes in your workflow, never `rivalry-core-beta`, and check the bytes:
 
 ```sh
-gh release download "$RIVALRY_TAG" --repo Meitou-Modding-Ecosystem/MeitouMods --pattern 'RivalryCore-*.zip' --dir deps
+gh release download "$RIVALRY_TAG" --repo Meitou-Modding-Ecosystem/RivalryCore --pattern 'RivalryCore-*.zip' --dir deps
 echo "$RIVALRY_SHA256  $(ls deps/RivalryCore-*.zip)" | sha256sum -c -
 ```
 
@@ -109,7 +119,10 @@ compiler never ties to Rivalry Core.
 "dependencies": [{ "id": "rivalry.core", "version": ">=0.6.0 <0.7.0" }]
 ```
 
-- Before 1.0 a minor version may break the API, so cap the range at the next minor. 0.6.0 is the first version with party caps.
+- Before 1.0 a minor version may break the API, so cap the range at the next minor. 0.6.0 is the first version with party caps; 0.6.1 adds
+  the rest between hunts (`HostileRestUntil`); 0.6.2 who goes next (`Propose`, `Rule.Grudge`, `Assessment.Propose`); 0.6.4 builds against
+  Meitou 0.22 and needs it (`gameVersion` `>=0.22.0 <0.22.2`); 0.6.5 renames `MaxHuntsPerAssessment` to
+  `GrudgeCandidatesPerAssessment` (the old name still works, marked obsolete).
 - Rivalry Core must sit above your mod in `data/mods.cfg`; the launcher and loader say "move X above it" otherwise.
 
 ## 3. Two ways players get it
@@ -139,7 +152,7 @@ public void Initialize(ModContext c)
         Name = $"{c.Id}.collectors",
         Target = BuiltIn.CharacterTarget,
         When = (a, t) => a.Notoriety.Grudge(a.Data.FactionIndex("1234-mymod.mod"), t.Character) >= a.Options.HuntThreshold,
-        Behaviour = BuiltIn.Pursue,                    // hostile: counted under the cap
+        Behaviour = BuiltIn.Pursue,                    // hostile: counted under the cap, waits its turn
         CooldownHours = _ => 48,
         Faction = (a, _) => a.Data.FactionIndex("1234-mymod.mod"),
         Args = (_, _) => new BehaviourArgs().Set("template", "5678-mymod.mod"),
@@ -161,22 +174,38 @@ Details: [rivalry-core.md "Party caps"](rivalry-core.md#party-caps).
 - **Using a built-in behaviour or decision**: nothing to do. `pursue`, `burgle`, `raid`, `hunt` are hostile; `visit`, `reinforce` friendly.
 - **Your own behaviour**: declare `public PartyKind Party => PartyKind.Hostile;` (or `Friendly`). Override `Underway(run)` when a run stops
   counting before it ends (as a hit squad does once beaten). A behaviour that sends people and declares `None` slips past the cap: don't.
-- **Your own director**: check `assessment.MayStart(PartyKind.Hostile, Name)` before `TryClaim`; a start over the cap is held when carried
-  out and the cooldown is spent.
-- **A party your mod runs itself** (its own pursuit code, not a Rivalry behaviour): claim a slot before sending, renew it while out,
-  release it after.
+- **Who goes first**: hostile candidates from every mod are ranked by grudge − 2 × travel hours + 1 × hours waited
+  ([rivalry-core.md "Who goes next"](rivalry-core.md#who-goes-next)). A hostile rule is a candidate by itself; set `Rule.Grudge` when the
+  faction's grudge against the target is not what should rank it.
+- **Your own director**: propose hostile parties instead of deciding them, and claim the cooldown in the dispatch; for friendly ones check
+  `assessment.MayStart(PartyKind.Friendly, Name)` before `TryClaim`.
+
+```csharp
+var at = a.Report.Find(who)!.Position;
+var candidate = new HostileCandidate(Name, key, faction, grudge, a.TravelHours(faction, at));
+a.Propose(candidate, () => { if (d.TryClaim(key, 48)) d.Start(BuiltIn.Pursue, target, args); });
+```
+
+- **A party your mod runs itself** (its own pursuit code, not a Rivalry behaviour): propose it, send it once it holds the slot, renew the
+  claim while out, release it after.
 
 ```csharp
 var state = rivalry.In(world);                        // in your system's serial step
-var claim = new PartyClaim($"{c.Id}.bounty", PartyKind.Hostile, characterName, hours: 6, faction);
-if (state?.ClaimParty(claim) != true) return;         // cap full: send nothing now, ask again later
-// ... while the crew is out, call ClaimParty(claim) again within 6 h; when it ends:
-state.ReleaseParty(claim.Source, claim.Key);
+var key = characterName;
+var travel = state?.TravelHours(faction, characterId) ?? 0;
+var candidate = new HostileCandidate($"{c.Id}.bounty", key, faction, grudge, travel, ClaimHours: 6);
+if (state?.Propose(candidate) != true) return;        // waiting its turn (or resting): propose again next assessment
+// ... send the crew; while it is out, call ClaimParty(new PartyClaim(candidate.Source, PartyKind.Hostile, key, 6, faction)) within 6 h:
+state.ReleaseParty(candidate.Source, key);            // when it ends
 ```
+
+- `ClaimParty` alone still works (it takes a free slot at once, skipping the queue); use it only for a party that cannot wait, such as one
+  already under way when your mod loads.
 
 - **Going over the cap**: only on purpose, in `Initialize`: `mine.ExceedHostileCap($"{c.Id}.siege", 1, "the siege brings its own scouts")`.
   The source may send one more than the cap; its parties still count for everyone else. `Rivalry: parties` (F10) lists every override.
-- **Seeing it**: `IRivalryState.Parties`, `PartiesOut(kind)`, `PartyCap(kind)`; F10 `Rivalry: parties` and `Rivalry: log` (`held: ...`).
+- **Seeing it**: `IRivalryState.Parties`, `PartiesOut(kind)`, `PartyCap(kind)`, `HostileRestUntil`, `Waiting`; F10 `Rivalry: parties` and
+  `Rivalry: log` (`held: ...`).
 
 
 ### Packaging publication checks

@@ -107,7 +107,9 @@ internal sealed class Actions(PopulationData data, PopulationSystem? population,
     string Relation(World world, RelationDecision d)
     {
         if (world.Player.Faction < 0 || !data.Relations.Contains(d.Faction)) return "relation: no such faction";
-        PlayerRelations.Add(world, data.Relations, d.Faction, world.Player.Faction, d.Delta);
+
+        // The engine has no cause for a mod's change; a scripted relation change is the nearest (as a dialogue's "change relations").
+        PlayerRelations.Add(world, data.Relations, d.Faction, world.Player.Faction, d.Delta, new RelationCause(RelationCauseType.Dialogue));
         return $"relation: {FactionName(d.Faction)} {d.Delta:+0.#;-0.#}";
     }
 
@@ -147,9 +149,8 @@ internal sealed class Actions(PopulationData data, PopulationSystem? population,
     static float LeaderDistance(World world, Squad squad, Vector3 at)
     {
         if (!world.Characters.TryResolveNext(squad.Leader, out int slot)) return float.MaxValue;
-        var p = world.Characters.Next[slot].Position;
-        return Vector2.Distance(new Vector2(p.X, p.Z), new Vector2(at.X, at.Z));
+        return Ground.FlatDistance(world.Characters.Next[slot].Position, at);
     }
 
-    string FactionName(int faction) => faction >= 0 && faction < data.Factions.Count ? data.Factions[faction].Name : $"faction {faction}";
+    string FactionName(int faction) => data.FactionAt(faction)?.Name ?? $"faction {faction}";
 }

@@ -1,7 +1,8 @@
 {
   "id": "rivalry.core",
-  "version": "0.6.0",
+  "version": "0.6.5",
   "apiVersion": 2,
+  "gameVersion": ">=0.22.0 <0.22.2",
   "assemblies": ["RivalryCore.dll"],
   "entry": "Rivalry.RivalryMod"
 }

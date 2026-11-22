@@ -6,11 +6,10 @@ same from a terminal.
 
 ## What a play build does
 
-- Builds `engine/src/Meitou.Game`, `AshenHand.Data` and each mod in **Release**, whatever the solution configuration: Debug engine builds
+- Builds `engine/src/Meitou.Game` and each mod in **Release**, whatever the solution configuration: Debug engine builds
   throw in `TaskStart.CheckStarts` once a mod starts a character's task. Breakpoints in mod code still work (Release symbols are deployed).
 - Copies each mod's `<Mod>.dll`, `<Mod>.pdb` and `meitou.json` to `<mods folder>/<Mod>/`. Close the game first: a running game locks the dll.
-- `AshenHand.mod` is generated from the installed game (`AshenHand.Data`) when missing or older than the generator; a failure is a build
-  warning and the mod is deployed without it. Other mods get an empty `<Mod>.mod` when they have none; an existing one is never replaced.
+- Each mod gets an empty `<Mod>.mod` when it has none; an existing one is never replaced.
 - When the mods folder doesn't exist (CI, Linux) nothing is copied and the build says so.
 
 A new mod is one `PlayMod` line in `Play/Play.csproj`.

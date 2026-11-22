@@ -1,14 +1,5 @@
 <Solution>
   <Project Path="Play/Play.csproj" />
-  <Folder Name="/AshenHand/">
-    <Project Path="AshenHand.Data/AshenHand.Data.csproj" />
-    <Project Path="AshenHand.Tests/AshenHand.Tests.csproj" />
-    <Project Path="AshenHand/AshenHand.csproj" />
-  </Folder>
-  <Folder Name="/Husbandry/">
-    <Project Path="Husbandry.Data/Husbandry.Data.csproj" />
-    <Project Path="Husbandry/Husbandry.csproj" />
-  </Folder>
   <Folder Name="/engine/">
     <Project Path="engine/src/Meitou.Core/Meitou.Core.csproj" />
     <Project Path="engine/src/Meitou.Data/Meitou.Data.csproj" />
@@ -18,10 +9,6 @@
   <Folder Name="/RivalryCore/">
     <Project Path="RivalryCore.Tests/RivalryCore.Tests.csproj" />
     <Project Path="RivalryCore/RivalryCore.csproj" />
-  </Folder>
-  <Folder Name="/SquadRating/">
-    <Project Path="SquadArena/SquadArena.csproj" />
-    <Project Path="SquadRating/SquadRating.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/EmptyMod/EmptyMod.csproj" />

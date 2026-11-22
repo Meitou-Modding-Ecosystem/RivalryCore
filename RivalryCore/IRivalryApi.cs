@@ -72,6 +72,12 @@ public interface IRivalryState
     int PartyCap(PartyKind kind);
 
     /// <summary>
+    /// The game hour the rest after the last hostile party ends: no hostile party starts or is claimed before it (the settings "Rest between
+    /// hunts", floor and ceiling).
+    /// </summary>
+    double HostileRestUntil { get; }
+
+    /// <summary>
     /// Counts a party the calling mod runs itself under the caps, or renews its claim of the same source and key: true when it holds. False:
     /// the cap is full (send nothing now and ask again later). The claim lapses <see cref="PartyClaim.Hours"/> after it was made or renewed, so
     /// renew it while the party is out and release it when it ends.
@@ -82,4 +88,22 @@ public interface IRivalryState
     /// Ends a claim made with <see cref="ClaimParty"/>; false when there was none.
     /// </summary>
     bool ReleaseParty(string source, string key);
+
+    /// <summary>
+    /// Puts a hostile party the calling mod would send now in the queue of who goes next (docs/rivalry-core.md "Who goes next"): true when it
+    /// won and holds a claim of <see cref="HostileCandidate.ClaimHours"/> (send it now, renew with <see cref="ClaimParty"/> while it is out,
+    /// release it when it ends). False: it waits; propose it again at least every assessment while it still wants to go, or it is dropped.
+    /// </summary>
+    bool Propose(HostileCandidate candidate);
+
+    /// <summary>
+    /// The travel time in game hours from the faction's base nearest the character to it (the same rule as Rivalry Core's own hunters); for a
+    /// <see cref="HostileCandidate"/>'s <see cref="HostileCandidate.TravelHours"/>. Serial steps only.
+    /// </summary>
+    double TravelHours(int faction, CharacterId target);
+
+    /// <summary>
+    /// The hostile candidates of the latest assessment, best first, with their scores and the hours each has waited. A copy.
+    /// </summary>
+    IReadOnlyList<WaitingView> Waiting { get; }
 }

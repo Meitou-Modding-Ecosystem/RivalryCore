@@ -59,8 +59,10 @@ public static class FactionBases
         if (faction < 0 || faction >= data.Factions.Count) return [];
 
         var cache = Caches.GetValue(data, d => new Cache(d));
-        IReadOnlyList<FactionBase>[] kinds = [Named(data, named), Owned(data, faction), cache.Spawning(faction), cache.Regions(faction)];
-        return kinds.FirstOrDefault(k => k.Count > 0) ?? [];
+        if (Named(data, named) is { Count: > 0 } byName) return byName;
+        if (Owned(data, faction) is { Count: > 0 } owned) return owned;
+
+        return cache.Spawning(faction) is { Count: > 0 } spawning ? spawning : cache.Regions(faction);
     }
 
     /// <summary>
@@ -113,7 +115,7 @@ public static class FactionBases
     /// <summary>
     /// A site as a base.
     /// </summary>
-    static FactionBase Site(TownSite s, BaseSource source) => new(new Vector2(s.Position.X, s.Position.Z), s.Index, source, s.Town.Name);
+    static FactionBase Site(TownSite s, BaseSource source) => new(s.Position.Flat(), s.Index, source, s.Town.Name);
 
     /// <summary>
     /// The centres of the map cells whose region matches.

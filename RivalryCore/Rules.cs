@@ -2,8 +2,9 @@ namespace Rivalry;
 
 /// <summary>
 /// Evaluates the rules at an assessment (docs/rivalry-core.md "Rules"): for each rule, in the order added, and each target of its kind, in the
-/// kind's order: not cooling, every condition holds, the chance roll passes, the party cap admits one more of its behaviour's kind, a faction is
-/// found when the rule names one; then the cooldown is claimed and the behaviour's start is recorded. A rule that throws is logged and off for
+/// kind's order: not cooling, every condition holds, the chance roll passes, a faction is found when the rule names one; a hostile start then
+/// becomes a candidate (<see cref="HuntQueue"/>), any other needs its party cap to admit it; then the cooldown is claimed and the start is
+/// recorded. A rule that throws is logged and off for
 /// the rest of that world.
 /// </summary>
 internal sealed class RuleEngine(Registry registry, Action<string> log)
@@ -101,11 +102,33 @@ internal sealed class RuleEngine(Registry registry, Action<string> log)
         {
             if (d.Cooling(target.Key) || !Holds(a, rule, target)) continue;
             if (chance is { } c && a.Roll($"{rule.Name}/{target.Key}") >= c) continue;
+            if (kind == PartyKind.Hostile)
+            {
+                if (WithFaction(a, rule, target) is { } candidate) Propose(a, rule, candidate, d, cooldown);
+                continue;
+            }
             if (!a.MayStart(kind, rule.Name)) continue;
             if (WithFaction(a, rule, target) is not { } aimed || !d.TryClaim(target.Key, cooldown)) continue;
 
             Record(a, rule, aimed, d);
         }
+    }
+
+    /// <summary>
+    /// A hostile start becomes a candidate (docs/rivalry-core.md "Who goes next"): scored on its grudge and the travel from the faction's nearest
+    /// base; sending it claims the cooldown and records the start.
+    /// </summary>
+    static void Propose(Assessment a, Rule rule, RuleTarget target, Decisions d, double cooldown)
+    {
+        var args = rule.Args?.Invoke(a, target);
+        float grudge = rule.Grudge?.Invoke(a, target) ?? a.GrudgeAt(target.Faction, target);
+        double travel = target.Faction >= 0 && a.PositionOf(target) is { } at ? a.TravelHours(target.Faction, at, args?.Text("home")) : 0;
+        var candidate = new HostileCandidate(rule.Name, target.Key, target.Faction, grudge, travel);
+
+        a.Propose(candidate, () =>
+        {
+            if (d.TryClaim(target.Key, cooldown)) Record(a, rule, target, d, args);
+        });
     }
 
     /// <summary>
@@ -142,9 +165,9 @@ internal sealed class RuleEngine(Registry registry, Action<string> log)
     /// <summary>
     /// Records the behaviour's start and the rule's notice.
     /// </summary>
-    static void Record(Assessment a, Rule rule, RuleTarget target, Decisions d)
+    static void Record(Assessment a, Rule rule, RuleTarget target, Decisions d, BehaviourArgs? args = null)
     {
-        d.Start(rule.Behaviour, target, rule.Args?.Invoke(a, target));
+        d.Start(rule.Behaviour, target, args ?? rule.Args?.Invoke(a, target));
         if (a.Options.Announce && rule.Notice?.Invoke(a, target) is { } message) d.Notice(message);
     }
 }

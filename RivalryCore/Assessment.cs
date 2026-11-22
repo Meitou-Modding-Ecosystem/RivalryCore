@@ -1,3 +1,4 @@
+using System.Numerics;
 using Meitou.Data.Gameplay;
 using Meitou.Simulation;
 
@@ -26,9 +27,16 @@ public sealed class Assessment
     /// </summary>
     readonly IReadOnlyList<Decision> _pending;
 
+    /// <summary>
+    /// The hostile candidates proposed at this assessment; the best one the caps admit is sent after the directors.
+    /// </summary>
+    readonly List<Proposal> _proposals;
+
     internal Assessment(World world, PopulationData data, PlayerReport report, NotorietyLedger notoriety, RivalryOptions options, RngPurpose purpose,
-        Catalogue catalogue, RivalRoster rivals, IReadOnlyList<BehaviourRun> runs, Parties parties, IReadOnlyList<Decision> pending)
+        Catalogue catalogue, RivalRoster rivals, IReadOnlyList<BehaviourRun> runs, Parties parties, IReadOnlyList<Decision> pending,
+        List<Proposal> proposals)
     {
+        _proposals = proposals;
         _catalogue = catalogue;
         _runs = runs;
         _parties = parties;
@@ -71,12 +79,62 @@ public sealed class Assessment
     /// Whether <paramref name="source"/> (a rule's or director's name) may send one more party of the kind now: under the cap, or under its
     /// override. Check it before claiming a cooldown: a start over the cap is refused when carried out, and the cooldown would be spent.
     /// </summary>
-    public bool MayStart(PartyKind kind, string source) => _parties.Admits(kind, source, PartiesOut(kind), Options);
+    public bool MayStart(PartyKind kind, string source) => _parties.Admits(kind, source, PartiesOut(kind), Options, GameHours);
 
     /// <summary>
     /// The party kind of a behaviour by name; none when it is not registered.
     /// </summary>
     public PartyKind KindOf(string behaviour) => _parties.KindOf(behaviour);
+
+    /// <summary>
+    /// Proposes a hostile party (docs/rivalry-core.md "Who goes next"): after the rules and directors, the best-scoring candidate the caps admit
+    /// has <paramref name="dispatch"/> run (claim the cooldown and record the decisions there); the others wait. A director sending a hostile
+    /// party proposes it instead of deciding it.
+    /// </summary>
+    public void Propose(HostileCandidate candidate, Action dispatch)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        ArgumentNullException.ThrowIfNull(dispatch);
+        _proposals.Add(new Proposal(candidate, () => Sends(dispatch)));
+    }
+
+    /// <summary>
+    /// Runs a candidate's dispatch; whether it recorded a decision.
+    /// </summary>
+    bool Sends(Action dispatch)
+    {
+        int before = _pending.Count;
+        dispatch();
+        return _pending.Count > before;
+    }
+
+    /// <summary>
+    /// The travel time in game hours from the faction's base nearest a point to it (<see cref="Travel"/>), with <paramref name="home"/>'s names.
+    /// </summary>
+    public double TravelHours(int faction, Vector3 to, string? home = null) => Travel.Hours(Data, Options, faction, to.Flat(), home);
+
+    /// <summary>
+    /// Where a target stands: its character, else its town; null when neither is in the report.
+    /// </summary>
+    public Vector3? PositionOf(RuleTarget target) => Report.Find(target.Character)?.Position ?? Report.TownOf(target.Town)?.Position;
+
+    /// <summary>
+    /// The grudge behind a party against a target: the faction's grudge against its character, or for a town the largest against the player
+    /// characters in it; 0 with none.
+    /// </summary>
+    public float GrudgeAt(int faction, RuleTarget target)
+    {
+        if (faction < 0) return 0;
+        if (!target.Character.IsNone) return Notoriety.Grudge(faction, target.Character);
+
+        if (target.Town <= 0) return 0;
+
+        return Report.Characters
+            .Where(c => c.Town == target.Town)
+            .Select(c => Notoriety.Grudge(faction, c.Id))
+            .DefaultIfEmpty(0)
+            .Max();
+    }
 
     /// <summary>
     /// Game hours since the faction's last hit squad finished; infinity when none has.
@@ -115,7 +173,12 @@ public sealed class Assessment
     /// <summary>The campaign of a kind a raid or reinforcement by the faction would request (<see cref="Catalogue.CampaignFor"/>); null when it has none.</summary>
     public string? CampaignFor(int faction, CampaignKey key) => _catalogue.CampaignFor(faction, key);
 
-    public FactionData? Faction(int faction) => faction >= 0 && faction < Data.Factions.Count ? Data.Factions[faction] : null;
+    public FactionData? Faction(int faction) => Data.FactionAt(faction);
 
     bool Known(int faction) => PlayerFaction >= 0 && Data.Relations.Contains(faction) && Data.Relations.Contains(PlayerFaction);
 }
+
+/// <summary>
+/// A hostile candidate and what sending it does: true when it went.
+/// </summary>
+internal readonly record struct Proposal(HostileCandidate Candidate, Func<bool> Dispatch);

@@ -94,11 +94,13 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
     };
 
     /// <summary>
-    /// Whether one more party of the kind from <paramref name="source"/> may start with <paramref name="out"/> already out.
+    /// Whether one more party of the kind from <paramref name="source"/> may start at <paramref name="now"/> with <paramref name="out"/>
+    /// already out: under its cap and, for a hostile one, past the rest after the last hostile party.
     /// </summary>
-    public bool Admits(PartyKind kind, string source, int @out, RivalryOptions options)
+    public bool Admits(PartyKind kind, string source, int @out, RivalryOptions options, double now)
     {
         if (kind == PartyKind.None) return true;
+        if (kind == PartyKind.Hostile && Resting(now)) return false;
 
         int extra = kind == PartyKind.Hostile ? _extra.GetValueOrDefault(source) : 0;
         return @out < Cap(kind, options) + extra;
@@ -224,16 +226,77 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
             held.Until = now + claim.Hours;
             return true;
         }
-        if (!Admits(claim.Kind, claim.Source, @out, options)) return false;
+        if (!Admits(claim.Kind, claim.Source, @out, options, now)) return false;
 
         _ledger.Add(new LedgerEntry(claim.Kind, claim.Source, ClaimWhat, claim.Key, claim.Faction, 0, false) { Until = now + claim.Hours });
         return true;
     }
 
     /// <summary>
+    /// Whether another mod holds a claim of the source and key.
+    /// </summary>
+    public bool Holds(string source, string key) => _ledger.Any(e => e.What == ClaimWhat && e.Source == source && e.Key == key);
+
+    /// <summary>
     /// Ends another mod's claim; false when it held none.
     /// </summary>
     public bool Release(string source, string key) => _ledger.RemoveAll(e => e.What == ClaimWhat && e.Source == source && e.Key == key) > 0;
+
+    #endregion
+
+    #region Rest
+
+    /// <summary>
+    /// The rest settings' bounds (game hours).
+    /// </summary>
+    public const int RestMax = 168;
+
+    /// <summary>
+    /// Whether a hostile party was out at the last look.
+    /// </summary>
+    bool _hostileOut;
+
+    /// <summary>
+    /// The game hour the rest after the last hostile party ends; no hostile party starts before it.
+    /// </summary>
+    double _restUntil;
+
+    /// <summary>
+    /// The game hour the rest ends (in the past when not resting).
+    /// </summary>
+    public double RestUntil => _restUntil;
+
+    /// <summary>
+    /// Whether the rest after the last hostile party holds new ones back at <paramref name="now"/>.
+    /// </summary>
+    public bool Resting(double now) => now < _restUntil;
+
+    /// <summary>
+    /// Looks at the hostile parties out, every slow step: when the last one has ended, the rest starts, its length rolled from
+    /// <paramref name="roll"/> (uniform in [0, 1)) between the settings' floor and ceiling, whole hours.
+    /// </summary>
+    public void Look(int hostileOut, double now, float roll, RivalryOptions options)
+    {
+        if (hostileOut > 0)
+        {
+            _hostileOut = true;
+            return;
+        }
+        if (!_hostileOut) return;
+
+        _hostileOut = false;
+        _restUntil = now + RestHours(roll, options);
+    }
+
+    /// <summary>
+    /// A rest's length: a whole number of hours from the floor to the ceiling, both included (a ceiling under the floor counts as the floor).
+    /// </summary>
+    public static int RestHours(float roll, RivalryOptions options)
+    {
+        int floor = Math.Clamp(options.HuntRestMinHours, 0, RestMax);
+        int ceiling = Math.Clamp(options.HuntRestMaxHours, floor, RestMax);
+        return Math.Min(ceiling, floor + (int)(roll * (ceiling - floor + 1)));
+    }
 
     #endregion
 
@@ -253,6 +316,9 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
             h.Add(e.Faction);
             h.Add(e.Until);
         }
+
+        h.Add(_hostileOut ? 1 : 0);
+        h.Add(_restUntil);
     }
 
     /// <summary>
@@ -267,11 +333,29 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
             w.Write(e.Source);
             w.Write(e.What);
             w.Write(e.Key);
-            w.Write(e.Faction >= 0 && e.Faction < data.Factions.Count ? data.Factions[e.Faction].Id : "");
+            w.Write(data.FactionAt(e.Faction)?.Id ?? "");
             w.Write(e.Town);
             w.Write(e.Campaign);
             w.Write(e.Until);
         }
+    }
+
+    /// <summary>
+    /// The rest: whether a hostile party was out, and when the rest ends.
+    /// </summary>
+    public void WriteRest(BinaryWriter w)
+    {
+        w.Write(_hostileOut);
+        w.Write(_restUntil);
+    }
+
+    /// <summary>
+    /// Reads the rest <see cref="WriteRest"/> wrote.
+    /// </summary>
+    public void ReadRest(BinaryReader r)
+    {
+        _hostileOut = r.ReadBoolean();
+        _restUntil = r.ReadDouble();
     }
 
     /// <summary>

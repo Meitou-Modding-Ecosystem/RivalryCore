@@ -13,7 +13,7 @@ jobs:
   release-gate:
     permissions:
       contents: read
-    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@b61f1f282b7366f06915df81c5012330cdaf9fa3
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@2136f4ee8e7c9461d635a3960d10c68d06dde893
 
   mod:
     needs: release-gate
@@ -32,8 +32,6 @@ jobs:
           # Tag slug -> mod folder and whether it ships an empty .mod (a code mod without data). Add a line per mod.
           case "${TAG%-v*}" in
             rivalry-core) echo "folder=RivalryCore" >> "$GITHUB_OUTPUT"; echo "empty=true" >> "$GITHUB_OUTPUT" ;;
-            ashen-hand)   echo "folder=AshenHand"   >> "$GITHUB_OUTPUT"; echo "empty=false" >> "$GITHUB_OUTPUT" ;;
-            husbandry)    echo "folder=Husbandry"   >> "$GITHUB_OUTPUT"; echo "empty=false" >> "$GITHUB_OUTPUT" ;;
             *) echo "no mod for tag '$TAG'" >&2; exit 1 ;;
           esac
 
@@ -41,7 +39,7 @@ jobs:
     needs: [mod, release-gate]
     permissions:
       contents: write
-    uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-meitou-mod.yml@b61f1f282b7366f06915df81c5012330cdaf9fa3
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-meitou-mod.yml@2136f4ee8e7c9461d635a3960d10c68d06dde893
     with:
       mod-folder: ${{ needs.mod.outputs.folder }}
       slug: ${{ needs.mod.outputs.slug }}

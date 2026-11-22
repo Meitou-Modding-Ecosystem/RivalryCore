@@ -258,7 +258,7 @@ public sealed class Inspector(PopulationData data, IReadOnlyList<(string Name, F
         float bestDistance = float.MaxValue;
         foreach (var t in towns)
         {
-            float d = Vector2.Distance(new Vector2(at.X, at.Z), new Vector2(t.Position.X, t.Position.Z));
+            float d = Ground.FlatDistance(at, t.Position);
             if (d <= t.Radius && d < bestDistance) (best, bestDistance) = (t.Number, d);
         }
         return best;

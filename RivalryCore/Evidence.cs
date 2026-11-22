@@ -32,7 +32,7 @@ public static class Evidence
     public static void Plant(BehaviourContext context, BehaviourRun run, Squad squad, CrimeCode crime)
     {
         if (run.Args.Text("evidence") is not { Length: > 0 } record) return;
-        if (Leader(context.World, squad) is not { PortraitSerial: { } serial, Inventory: { } inventory }) return;
+        if (SquadDriver.FirstLiving(context.World, squad) is not { PortraitSerial: { } serial, Inventory: { } inventory }) return;
         if (context.Data.Items.Create(record) is not { } note) return;
 
         note.ModTag = Tag(serial, BountyFor(run.Args), crime);
@@ -53,18 +53,6 @@ public static class Evidence
     /// </summary>
     public static string Tag(uint serial, int bounty, CrimeCode crime) =>
         string.Join('|', TagPrefix, serial.ToString(CultureInfo.InvariantCulture), bounty.ToString(CultureInfo.InvariantCulture), (int)crime);
-
-    /// <summary>
-    /// The squad's first living member.
-    /// </summary>
-    static CharacterCold? Leader(World world, Squad squad)
-    {
-        var table = world.Characters;
-        foreach (var id in squad.Members)
-            if (table.TryResolveNext(id, out int slot) && table.Next[slot].Alive && table.Cold(slot) is { } c) return c;
-
-        return null;
-    }
 
     #endregion
 

@@ -359,7 +359,7 @@ internal sealed class BehaviourRuns(PopulationData data, IReadOnlyDictionary<str
             w.Write(run.Behaviour);
             w.Write(run.Source);
             w.Write(run.Key);
-            w.Write(run.Faction >= 0 && run.Faction < data.Factions.Count ? data.Factions[run.Faction].Id : "");
+            w.Write(data.FactionAt(run.Faction)?.Id ?? "");
             w.Write(run.Town);
             w.Write(run.Phase);
             w.Write(run.Started);

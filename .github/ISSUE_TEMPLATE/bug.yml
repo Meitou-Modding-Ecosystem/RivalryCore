@@ -6,7 +6,7 @@ body:
     id: mod
     attributes:
       label: Mod
-      options: [Rivalry Core, The Ashen Hand, Husbandry, Other / not sure]
+      options: [Rivalry Core, Other / not sure]
     validations:
       required: true
   - type: input

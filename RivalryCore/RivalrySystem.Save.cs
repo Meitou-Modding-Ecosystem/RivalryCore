@@ -6,7 +6,7 @@ namespace Rivalry;
 public sealed partial class RivalrySystem
 {
     /// <summary>The sidecar layout's version (docs/rivalry-core.md "Save data").</summary>
-    public const int SaveVersion = 4;
+    public const int SaveVersion = 6;
 
     /// <summary>A saved grudge waiting for its character: faction by string id, character by name and record (slots differ after a load).</summary>
     readonly record struct SavedGrudge(string Faction, string Name, string Record, float Value, float HeldFloor = 0);
@@ -14,6 +14,11 @@ public sealed partial class RivalrySystem
     readonly record struct Subject(string Name, string Record);
 
     readonly Dictionary<CharacterId, Subject> _subjects = [];
+
+    /// <summary>
+    /// <see cref="NotorietyLedger.Started"/> when every grudge last had a subject named.
+    /// </summary>
+    int _namedAt = -1;
     List<SavedGrudge>? _pending;
 
     public void Write(Stream stream)
@@ -34,6 +39,8 @@ public sealed partial class RivalrySystem
         _runs.Write(_world, w);
         Rivals.Write(w);
         _parties.Write(w, _data);
+        _parties.WriteRest(w);
+        _queue.Write(w);
     }
 
     void WriteGrudges(BinaryWriter w)
@@ -85,6 +92,13 @@ public sealed partial class RivalrySystem
 
         // Version 4 adds, last, the party ledger (one-shot parties and other mods' claims).
         if (version >= 4) _parties.Read(r, _data);
+
+        // Version 5 adds, last, the rest between hunts.
+        if (version >= 5) _parties.ReadRest(r);
+
+        // Version 6 adds, last, the hours the hostile candidates have waited.
+        if (version >= 6) _queue.Read(r);
+        else _queue.Clear();
     }
 
     static List<SavedGrudge> ReadGrudges(BinaryReader r, bool withFloors)
@@ -137,11 +151,27 @@ public sealed partial class RivalrySystem
         return CharacterId.None;
     }
 
+    /// <summary>
+    /// Notes the name and record of everyone held a grudge against, for the save; only after a new grudge started, until all are named.
+    /// </summary>
     void NameSubjects(World world)
     {
-        if (Notoriety.Entries.All(g => _subjects.ContainsKey(g.Key.Who))) return;
+        if (Notoriety.Started == _namedAt) return;
+        if (!Notoriety.Entries.All(g => _subjects.ContainsKey(g.Key.Who))) Rename(world);
+        if (Notoriety.Entries.All(g => _subjects.ContainsKey(g.Key.Who))) _namedAt = Notoriety.Started;
+    }
+
+    /// <summary>
+    /// Names every character held a grudge against afresh.
+    /// </summary>
+    void Rename(World world)
+    {
         _subjects.Clear();
         foreach (var (key, _) in Notoriety.Entries)
-            if (world.Characters.TryResolveNext(key.Who, out int slot) && world.Characters.Cold(slot) is { } c) _subjects[key.Who] = new Subject(c.Name, c.RecordId);
+        {
+            if (!world.Characters.TryResolveNext(key.Who, out int slot) || world.Characters.Cold(slot) is not { } c) continue;
+
+            _subjects[key.Who] = new Subject(c.Name, c.RecordId);
+        }
     }
 }

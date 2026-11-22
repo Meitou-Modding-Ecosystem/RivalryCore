@@ -94,6 +94,11 @@ public sealed class Cooldowns
 
     public bool Cooling(string key, double now) => _until.TryGetValue(key, out double end) && end > now;
 
+    /// <summary>
+    /// The game hour the key stops cooling; 0 when it has no cooldown.
+    /// </summary>
+    public double Until(string key) => _until.GetValueOrDefault(key);
+
     public bool TryClaim(string key, double now, double hours)
     {
         if (Cooling(key, now)) return false;
