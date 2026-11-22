@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Meitou.Data;
 using Meitou.Data.Fcs;
+using Meitou.Data.Gameplay.Ai;
 using Meitou.Modding;
 using Meitou.Simulation;
 using Meitou.Simulation.Factions;
@@ -50,12 +51,14 @@ public class RivalryCoreTests
     /// A world with one player town and Rivalry Core as its only system.
     /// </summary>
     static (SimWorld World, RivalrySystem System, RivalryOptions Options) Make(PopulationData data, int threads = 1,
-        Action<IRivalryRegistry>? register = null)
+        Action<IRivalryRegistry>? register = null, bool moves = false)
     {
         var options = new RivalryOptions();
         var system = RivalrySystem.Create(new SystemBuildContext(data, []), options, (RngPurpose)0x80001234u, _ => { }, "test", register);
+        var walk = new OpenGroundWalkability((_, _) => 150);
+        List<ITickSystem> systems = moves ? [system, new MovementSystem(new PathService(walk, true))] : [system];
         var world = new SimWorld(new WorldSettings { Seed = 3, Threads = threads, PublishSnapshots = false, MinPartitionSize = 1 },
-            new OpenGroundWalkability((_, _) => 150), [system]);
+            walk, systems);
         world.Player.Faction = data.FactionIndex("204-gamedata.base");
         world.Buildings.AddTown(TownAt, world.Player.Faction, "Home");
         return (world, system, options);
@@ -711,16 +714,20 @@ public class RivalryCoreTests
     [Fact]
     public void A_redirected_walk_keeps_its_path_until_the_goal_moves_past_the_slack()
     {
-        var (world, _, _) = Make(Data());
-        var hunter = Spawn(world, "Hunter", world.Player.Faction + 1, TownAt);
+        var (world, _, _) = Make(Data(), moves: true);
+        int faction = world.Player.Faction + 1;
+        var hunter = Spawn(world, "Hunter", faction, TownAt, squad: world.Squads.NextId());
+        AddSquad(world, faction, hunter);
         world.RunTicks(1);
         int slot = hunter.Slot;
         var goal = TownAt + new Vector3(500, 0, 0);
 
         Assert.False(SquadDriver.WalkTo(world, slot, goal, run: true, redirect: true));
         Assert.Equal((byte)CharacterTask.GoTo, world.Characters.Next[slot].Task);
+        Assert.Equal(TaskType.MoveCusOrdered, world.Characters.Cold(slot)!.Running?.Row);   // a move order: the AI leaves the hunter to it
+        Assert.Equal(SpeedMode.Run, world.Characters.Cold(slot)!.RunSpeed);
 
-        // This world has no movement system: stand in for the walk it would have set up, and mark it to see whether a new one starts.
+        // Pin the walk's goal to the point and mark the walk, to see whether a new one starts.
         world.Characters.Next[slot].Goal = new Vector2(goal.X, goal.Z);
         world.Characters.Next[slot].TaskTime = 99;
 
