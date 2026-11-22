@@ -1,10 +1,14 @@
 using System.Numerics;
 using System.Text;
+using System.Text.Json;
 using Meitou.Data;
 using Meitou.Data.Fcs;
+using Meitou.Data.Gameplay.Ai;
 using Meitou.Modding;
 using Meitou.Simulation;
 using Meitou.Simulation.Factions;
+using Meitou.Simulation.Movement;
+using Meitou.Simulation.Player;
 using Meitou.Simulation.Population;
 using SimWorld = Meitou.Simulation.World;
 
@@ -48,12 +52,14 @@ public class RivalryCoreTests
     /// A world with one player town and Rivalry Core as its only system.
     /// </summary>
     static (SimWorld World, RivalrySystem System, RivalryOptions Options) Make(PopulationData data, int threads = 1,
-        Action<IRivalryRegistry>? register = null)
+        Action<IRivalryRegistry>? register = null, bool moves = false)
     {
         var options = new RivalryOptions();
         var system = RivalrySystem.Create(new SystemBuildContext(data, []), options, (RngPurpose)0x80001234u, _ => { }, "test", register);
+        var walk = new OpenGroundWalkability((_, _) => 150);
+        List<ITickSystem> systems = moves ? [system, new MovementSystem(new PathService(walk, true))] : [system];
         var world = new SimWorld(new WorldSettings { Seed = 3, Threads = threads, PublishSnapshots = false, MinPartitionSize = 1 },
-            new OpenGroundWalkability((_, _) => 150), [system]);
+            walk, systems);
         world.Player.Faction = data.FactionIndex("204-gamedata.base");
         world.Buildings.AddTown(TownAt, world.Player.Faction, "Home");
         return (world, system, options);
@@ -409,10 +415,11 @@ public class RivalryCoreTests
     /// <summary>
     /// A world with a standing player character and Rivalry Core's own rules off, so only the dependent's rules send parties.
     /// </summary>
-    static (SimWorld World, RivalrySystem System) MakeSending(Action<IRivalryRegistry> register)
+    static (SimWorld World, RivalrySystem System) MakeSending(Action<IRivalryRegistry> register, Action<RivalryOptions>? tune = null)
     {
         var (world, system, options) = Make(Data(), register: register);
         options.Reinforcements = options.OpportunistRaids = options.Hunters = false;
+        tune?.Invoke(options);
         Spawn(world, "Me", world.Player.Faction, TownAt);
         return (world, system);
     }
@@ -473,7 +480,7 @@ public class RivalryCoreTests
         {
             r.AddBehaviour(new Sending("test.raiders", PartyKind.Hostile));
             r.AddRule(Sends("test.raid", "test.raiders", () => tempted));
-        });
+        }, o => o.HuntRestMinHours = o.HuntRestMaxHours = 0);
         world.RunTicks(1);
         var claim = new PartyClaim("twr.bounty", PartyKind.Hostile, "Me", 100);
         Assert.True(system.ClaimParty(claim));
@@ -503,6 +510,256 @@ public class RivalryCoreTests
 
         Assert.Equal(1, system2.PartiesOut(PartyKind.Hostile));
         Assert.False(system2.ClaimParty(new PartyClaim("twr.reprisal", PartyKind.Hostile, "Me", 100)));
+    }
+
+    [Fact]
+    public void After_a_hostile_party_ends_none_starts_until_the_rest_is_over()
+    {
+        var (world, system) = MakeSending(_ => { });
+        world.RunTicks(1);
+        Assert.True(system.ClaimParty(new PartyClaim("twr.bounty", PartyKind.Hostile, "Me", 100)));
+        world.RunTicks(1);
+
+        Assert.True(system.ReleaseParty("twr.bounty", "Me"));
+        world.RunTicks(1);
+
+        Assert.Equal(world.GameHours + 12, system.HostileRestUntil, 0.01);   // the default floor and ceiling are both 12
+        Assert.False(system.ClaimParty(new PartyClaim("twr.reprisal", PartyKind.Hostile, "Me", 100)));
+        Assert.True(system.ClaimParty(new PartyClaim("test.guests", PartyKind.Friendly, "town1", 100)));   // friendly parties don't rest
+    }
+
+    /// <summary>
+    /// Another mod's candidate that wins an assessment, as an unconfirmed offer.
+    /// </summary>
+    static (SimWorld World, RivalrySystem System, HostileCandidate Bounty) Offered()
+    {
+        var (world, system) = MakeSending(_ => { });
+        world.RunTicks(1);
+        var bounty = new HostileCandidate("twr.bounty", "Me", -1, 200, 0);
+        Assert.False(system.Propose(bounty));
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+        Assert.Equal("twr.bounty", Assert.Single(system.Parties).Source);
+        return (world, system, bounty);
+    }
+
+    [Fact]
+    public void An_offer_released_before_it_is_confirmed_frees_the_slot_without_a_rest()
+    {
+        var (world, system, _) = Offered();
+
+        Assert.True(system.ReleaseParty("twr.bounty", "Me"));
+        world.RunTicks(1);
+
+        Assert.True(system.HostileRestUntil <= world.GameHours);
+        Assert.True(system.ClaimParty(new PartyClaim("twr.reprisal", PartyKind.Hostile, "Me", 100)));
+    }
+
+    [Fact]
+    public void An_offer_never_confirmed_lapses_after_one_assessment_without_a_rest()
+    {
+        var (world, system, _) = Offered();
+
+        world.GameHours += new RivalryOptions().AssessEveryHours + 0.5;
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+
+        Assert.Empty(system.Parties);
+        Assert.True(system.HostileRestUntil <= world.GameHours);
+    }
+
+    [Fact]
+    public void An_offer_confirmed_by_proposing_again_holds_its_claim_hours_and_its_end_starts_the_rest()
+    {
+        var (world, system, bounty) = Offered();
+        Assert.True(system.Propose(bounty));
+
+        world.GameHours += bounty.ClaimHours - 1;
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+        Assert.Equal("twr.bounty", Assert.Single(system.Parties).Source);
+
+        Assert.True(system.ReleaseParty("twr.bounty", "Me"));
+        world.RunTicks(1);
+        Assert.Equal(world.GameHours + 12, system.HostileRestUntil, 0.01);
+    }
+
+    [Fact]
+    public void An_offer_stays_unconfirmed_across_a_save()
+    {
+        var (_, system, _) = Offered();
+
+        var (world2, system2) = MakeSending(_ => { });
+        system2.Read(Saved(system));
+        world2.RunTicks(1);
+        Assert.Equal(1, system2.PartiesOut(PartyKind.Hostile));
+
+        Assert.True(system2.ReleaseParty("twr.bounty", "Me"));
+        world2.RunTicks(1);
+        Assert.True(system2.HostileRestUntil <= world2.GameHours);
+    }
+
+    [Theory]
+    [InlineData(6, 18, 0f, 6)]
+    [InlineData(6, 18, 0.999f, 18)]
+    [InlineData(6, 18, 0.5f, 12)]
+    [InlineData(12, 4, 0.7f, 12)]
+    public void The_rest_is_whole_hours_between_the_floor_and_the_ceiling(int floor, int ceiling, float roll, int hours)
+    {
+        var options = new RivalryOptions { HuntRestMinHours = floor, HuntRestMaxHours = ceiling };
+
+        Assert.Equal(hours, Parties.RestHours(roll, options));
+    }
+
+    #endregion
+
+    #region Who goes next
+
+    /// <summary>
+    /// A rule like <see cref="Sends"/> whose hostile start scores <paramref name="grudge"/>.
+    /// </summary>
+    static Rule Scores(string name, string behaviour, float grudge, Func<bool>? when = null) => new()
+    {
+        Name = name,
+        Behaviour = behaviour,
+        When = (_, _) => when?.Invoke() != false,
+        CooldownHours = _ => 1000,
+        Faction = (a, _) => a.Data.FactionIndex("61-a"),
+        Grudge = (_, _) => grudge,
+    };
+
+    /// <summary>
+    /// Ranks the candidates at <paramref name="now"/> and sends the best, as an assessment does.
+    /// </summary>
+    static HostileCandidate SendBest(HuntQueue queue, double now, params HostileCandidate[] candidates)
+    {
+        var best = queue.Rank(candidates, c => c, now, new RivalryOptions())[0];
+        queue.Sent(best);
+        return best;
+    }
+
+    [Fact]
+    public void A_near_grudge_goes_before_a_larger_far_one_until_the_far_one_has_waited()
+    {
+        var queue = new HuntQueue();
+        var far = new HostileCandidate("test.far", "Me", 2, 80, 20);    // 80 - 2 x 20 = 40
+        var near = new HostileCandidate("test.near", "Me", 1, 60, 2);   // 60 - 2 x 2 = 56
+
+        Assert.Equal(near, SendBest(queue, 0, far, near));
+
+        // Thirty hours later the far grudge scores 40 + 30 = 70 against a fresh near one's 56.
+        Assert.Equal(far, SendBest(queue, 30, far, near with { Key = "You" }));
+    }
+
+    [Fact]
+    public void A_waits_age_survives_a_save_and_is_forgotten_after_a_day_unproposed()
+    {
+        var queue = new HuntQueue();
+        var waiting = new HostileCandidate("test.raid", "town1", 1, 10, 0);
+        queue.Rank([waiting], c => c, 5, new RivalryOptions());
+
+        var stream = new MemoryStream();
+        queue.Write(new BinaryWriter(stream));
+        stream.Position = 0;
+        var loaded = new HuntQueue();
+        loaded.Read(new BinaryReader(stream));
+        Assert.Equal(5, loaded.Since(waiting, 20));
+
+        loaded.Rank<HostileCandidate>([], c => c, 5 + HuntQueue.ForgetHours + 1, new RivalryOptions());
+        Assert.Equal(40, loaded.Since(waiting, 40));
+    }
+
+    [Fact]
+    public void The_larger_grudge_goes_first_whatever_the_rule_order_and_the_other_waits()
+    {
+        var (world, system) = MakeSending(r =>
+        {
+            r.AddBehaviour(new Sending("test.raiders", PartyKind.Hostile));
+            r.AddRule(Scores("test.small", "test.raiders", 10));
+            r.AddRule(Scores("test.big", "test.raiders", 50));
+        });
+
+        world.RunTicks(2);
+
+        Assert.Equal("test.big", Assert.Single(system.Parties).Source);
+        Assert.Equal("test.small", Assert.Single(system.Waiting).Source);
+        Assert.Contains("waiting: test.small -> town1", system.Debug.DescribeParties());
+    }
+
+    [Fact]
+    public void Another_mods_candidate_that_wins_is_given_a_claim()
+    {
+        bool tempted = false;
+        var (world, system) = MakeSending(r =>
+        {
+            r.AddBehaviour(new Sending("test.raiders", PartyKind.Hostile));
+            r.AddRule(Scores("test.raid", "test.raiders", 10, () => tempted));
+        });
+        world.RunTicks(1);
+        tempted = true;
+        var bounty = new HostileCandidate("twr.bounty", "Me", -1, 200, system.TravelHours(-1, CharacterId.None), ClaimHours: 50);
+
+        Assert.False(system.Propose(bounty));   // waits for the next assessment
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+
+        Assert.True(system.Propose(bounty));
+        Assert.Equal("twr.bounty", Assert.Single(system.Parties).Source);
+        Assert.Equal("test.raid", Assert.Single(system.Waiting).Source);
+    }
+
+    #endregion
+
+    #region Squad driving
+
+    [Fact]
+    public void A_redirected_walk_keeps_its_path_until_the_goal_moves_past_the_slack()
+    {
+        var (world, _, _) = Make(Data(), moves: true);
+        int faction = world.Player.Faction + 1;
+        var hunter = Spawn(world, "Hunter", faction, TownAt, squad: world.Squads.NextId());
+        AddSquad(world, faction, hunter);
+        world.RunTicks(1);
+        int slot = hunter.Slot;
+        var goal = TownAt + new Vector3(500, 0, 0);
+
+        Assert.False(SquadDriver.WalkTo(world, slot, goal, run: true, redirect: true));
+        Assert.Equal((byte)CharacterTask.GoTo, world.Characters.Next[slot].Task);
+        Assert.Equal(TaskType.MoveCusOrdered, world.Characters.Cold(slot)!.Running?.Row);   // a move order: the AI leaves the hunter to it
+        Assert.Equal(SpeedMode.Run, world.Characters.Cold(slot)!.RunSpeed);
+
+        // Pin the walk's goal to the point; each new move order replaces the queue's front with a new entry.
+        world.Characters.Next[slot].Goal = new Vector2(goal.X, goal.Z);
+        var queue = world.Characters.Cold(slot)!.OrderQueue;
+        var first = Assert.IsType<OrderEntry>(queue.Front);
+
+        SquadDriver.WalkTo(world, slot, goal + new Vector3(SquadDriver.RedirectSlack / 2, 0, 0), run: true, redirect: true);
+        Assert.Same(first, queue.Front);      // moved within the slack: the same move
+
+        SquadDriver.WalkTo(world, slot, goal + new Vector3(SquadDriver.RedirectSlack * 3, 0, 0), run: true, redirect: true);
+        Assert.NotSame(first, queue.Front);   // moved past it: a new move
+        Assert.Equal(TaskType.MoveCusOrdered, queue.Front?.Row);
+    }
+
+    #endregion
+
+    #region Release build
+
+    /// <summary>
+    /// The engine assemblies Rivalry Core references are stamped as the oldest game its manifest admits (Directory.Build.rsp): a reference newer
+    /// than the released game, or the submodule's default 1.0.0.0, makes the game refuse the mod ("entry type ... is not in its assemblies", #121).
+    /// </summary>
+    [Fact]
+    public void The_engine_references_match_the_oldest_game_the_manifest_admits()
+    {
+        string manifest = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "meitou.json"));
+        string range = JsonDocument.Parse(manifest).RootElement.GetProperty("gameVersion").GetString()!;
+        var floor = Version.Parse(range.Split(' ')[0].TrimStart('>', '='));
+
+        var engine = typeof(RivalryMod).Assembly.GetReferencedAssemblies().Where(a => a.Name!.StartsWith("Meitou", StringComparison.Ordinal)).ToList();
+
+        Assert.NotEmpty(engine);
+        Assert.All(engine, a => Assert.Equal(new Version(floor.Major, floor.Minor, floor.Build, 0), a.Version));
     }
 
     #endregion

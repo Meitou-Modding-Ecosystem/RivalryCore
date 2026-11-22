@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using Meitou.Simulation;
 using Meitou.Simulation.Crime;
 
@@ -37,9 +38,10 @@ public sealed class PursueBehaviour : IBehaviour
     const int WatchEveryTicks = 30;
 
     /// <summary>
-    /// The quarry of each run in this world's process, by run id; after a load found again by <c>quarryName</c>.
+    /// The quarry of each run, by world and run id; after a load found again by <c>quarryName</c>. Keyed weakly by world: the behaviour outlives
+    /// the worlds it runs in, and a world left behind by a load must not be kept alive by the runs it had under way.
     /// </summary>
-    readonly Dictionary<(World, int), CharacterId> _quarry = [];
+    readonly ConditionalWeakTable<World, Dictionary<int, CharacterId>> _quarry = [];
 
     public string Name => BuiltIn.Pursue;
 
@@ -79,12 +81,12 @@ public sealed class PursueBehaviour : IBehaviour
     /// </summary>
     void Aim(BehaviourContext context, BehaviourRun run, CharacterId quarry, int slot)
     {
-        _quarry[(context.World, run.Id)] = quarry;
+        QuarriesOf(context.World)[run.Id] = quarry;
         run.Args.Set("quarryName", context.World.Characters.Cold(slot)?.Name ?? "");
         context.Notoriety.HoldFloor(run.Faction, quarry, context.Options.HuntThreshold);
 
         var at = context.World.Characters.Next[slot].Position;
-        double hours = Travel.Hours(context, run.Faction, new Vector2(at.X, at.Z), run.Args);
+        double hours = Travel.Hours(context, run.Faction, at.Flat(), run.Args);
         run.Args.Set("travelHours", hours);
         run.Phase = hours > 0 ? Travelling : Spawning;
         run.Until = context.World.GameHours + (hours > 0 ? hours : SpawnWindowHours);
@@ -111,7 +113,7 @@ public sealed class PursueBehaviour : IBehaviour
     /// </summary>
     void Finish(BehaviourContext context, BehaviourRun run)
     {
-        _quarry.Remove((context.World, run.Id));
+        QuarriesOf(context.World).Remove(run.Id);
         MarkEnded(context, run);
         RivalLeaders.Release(context, run);
     }
@@ -149,15 +151,21 @@ public sealed class PursueBehaviour : IBehaviour
     /// </summary>
     CharacterId Quarry(BehaviourContext context, BehaviourRun run)
     {
-        if (!_quarry.TryGetValue((context.World, run.Id), out var id))
+        var quarries = QuarriesOf(context.World);
+        if (!quarries.TryGetValue(run.Id, out var id))
         {
             id = Named(context, run.Args.Text("quarryName")) ?? MostHated(context, run.Faction);
-            _quarry[(context.World, run.Id)] = id;
+            quarries[run.Id] = id;
         }
 
         var table = context.World.Characters;
         return table.TryResolveNext(id, out int slot) && table.Cold(slot) is { Medical.Incapacitated: false } ? id : CharacterId.None;
     }
+
+    /// <summary>
+    /// The quarries of the runs in a world, by run id.
+    /// </summary>
+    Dictionary<int, CharacterId> QuarriesOf(World world) => _quarry.GetOrCreateValue(world);
 
     /// <summary>
     /// The player character with the name; null when none.
@@ -184,8 +192,7 @@ public sealed class PursueBehaviour : IBehaviour
         var world = context.World;
         if (context.Population is not { } population || Quarry(context, run) is not { IsNone: false } quarry) return false;
 
-        var position = world.Characters.Next[quarry.Slot].Position;
-        var at = new Vector2(position.X, position.Z);
+        var at = world.Characters.Next[quarry.Slot].Position.Flat();
         int site = HomeSite(context, run, at);
         float min = (float)run.Args.Number("minRadius", context.Options.HuntSpawnMinRadius);
         float max = (float)run.Args.Number("maxRadius", context.Options.HuntSpawnMaxRadius);
@@ -295,11 +302,11 @@ public sealed class PursueBehaviour : IBehaviour
     static bool Seen(BehaviourContext context, Squad squad)
     {
         var table = context.World.Characters;
-        var members = squad.Members.Where(id => table.TryResolveNext(id, out _)).Select(id => Ground(table, id)).ToList();
+        var members = squad.Members.Where(id => table.TryResolveNext(id, out _)).Select(id => FlatAt(table, id)).ToList();
         foreach (var c in context.Report.Characters)
         {
             if (!table.TryResolveNext(c.Id, out int slot) || table.Cold(slot) is not { Medical.Incapacitated: false }) continue;
-            if (members.Any(m => Vector2.Distance(m, Ground(table, c.Id)) <= context.Options.SeenRange)) return true;
+            if (members.Any(m => Vector2.Distance(m, FlatAt(table, c.Id)) <= context.Options.SeenRange)) return true;
         }
 
         return false;
@@ -308,11 +315,7 @@ public sealed class PursueBehaviour : IBehaviour
     /// <summary>
     /// A character's position now on the ground plane.
     /// </summary>
-    static Vector2 Ground(CharacterTable table, CharacterId id)
-    {
-        var at = table.Next[id.Slot].Position;
-        return new Vector2(at.X, at.Z);
-    }
+    static Vector2 FlatAt(CharacterTable table, CharacterId id) => table.Next[id.Slot].Position.Flat();
 
     /// <summary>
     /// Lets the quarry's grudge cool freely again; with the quarry not found, every floor the faction holds.
@@ -336,10 +339,16 @@ public static class Travel
     /// <summary>
     /// The travel time in game hours to a point.
     /// </summary>
-    public static double Hours(BehaviourContext context, int faction, Vector2 to, BehaviourArgs args)
+    public static double Hours(BehaviourContext context, int faction, Vector2 to, BehaviourArgs args) =>
+        Hours(context.Data, context.Options, faction, to, args.Text("home"));
+
+    /// <summary>
+    /// The travel time in game hours from the faction's base nearest a point (with <paramref name="home"/>'s names, <c>|</c>-separated) to it.
+    /// </summary>
+    public static double Hours(PopulationData data, RivalryOptions options, int faction, Vector2 to, string? home = null)
     {
-        var options = context.Options;
-        if (Base(context, faction, to, args) is not { } from) return Math.Min(options.HuntTravelFallbackHours, options.HuntTravelMaxHours);
+        var names = FactionBases.NamesFor(data, faction, options, RivalLeaders.Split(home));
+        if (FactionBases.Nearest(data, faction, names, to) is not { } from) return Math.Min(options.HuntTravelFallbackHours, options.HuntTravelMaxHours);
 
         double hours = Vector2.Distance(from.Position, to) / Math.Max(1, options.HuntTravelUnitsPerHour);
         return Math.Clamp(hours, Math.Min(options.HuntTravelMinHours, options.HuntTravelMaxHours), options.HuntTravelMaxHours);

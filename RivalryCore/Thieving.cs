@@ -77,7 +77,7 @@ public sealed class BurgleBehaviour : IBehaviour
         var world = context.World;
         if (context.Population is not { } population || context.Report.TownOf(run.Town) is not { } town) return false;
 
-        var at = new Vector2(town.Position.X, town.Position.Z);
+        var at = town.Position.Flat();
         int site = VisitBehaviour.NearestSite(context.Data, at);
         int platoon = site < 0 ? -1 : population.SpawnPlatoon(world, run.Faction, run.Args.Text("template")!, site, at,
             (float)run.Args.Number("minRadius", 600), (float)run.Args.Number("maxRadius", 1200));
@@ -306,7 +306,7 @@ public sealed class BurgleBehaviour : IBehaviour
         if (context.System<CarrySystem>() is not { } carry) return false;
 
         var from = table.Next[thieves[0]].Position;
-        var market = new SlaveMarket(context.Data);
+        var market = SlaveMarket.For(context.Data);
         var body = context.Report.Characters
             .Where(c => c.Town == run.Town && c.Down && table.TryResolveNext(c.Id, out int s) && table.Cold(s) is { Race: { } race } cold
                 && cold.CarriedBy.IsNone && market.NearestBuyer(c.Position, race.StringId, run.Faction) >= 0)
@@ -327,7 +327,7 @@ public sealed class BurgleBehaviour : IBehaviour
         if (!table.TryResolveNext(table.Cold(carrier)!.Carrying, out int captive) || table.Cold(captive) is not { Race: { } race })
             return StartLeaving(context, run, squad);
 
-        int buyer = new SlaveMarket(context.Data).NearestBuyer(table.Next[carrier].Position, race.StringId, run.Faction);
+        int buyer = SlaveMarket.For(context.Data).NearestBuyer(table.Next[carrier].Position, race.StringId, run.Faction);
         if (buyer < 0) return StartLeaving(context, run, squad);
 
         run.Args.Set("buyer", buyer);

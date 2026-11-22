@@ -64,12 +64,14 @@ public sealed record DebugView(
     IReadOnlyList<(string Faction, double HoursAgo)> LastHitSquads,
     IReadOnlyList<PartyView> Parties,
     int FriendlyCap,
-    IReadOnlyList<CapOverride> Overrides)
+    IReadOnlyList<CapOverride> Overrides,
+    double RestUntil,
+    IReadOnlyList<WaitingView> Waiting)
 {
     /// <summary>
     /// Before the first step of a world.
     /// </summary>
-    public static readonly DebugView Empty = new(0, 0, [], [], [], [], [], [], [], [], 0, []);
+    public static readonly DebugView Empty = new(0, 0, [], [], [], [], [], [], [], [], 0, [], 0, []);
 
     #region Building
 
@@ -78,37 +80,39 @@ public sealed record DebugView(
     /// </summary>
     internal static DebugView Build(World world, PopulationData data, PlayerReport report, NotorietyLedger ledger, Cooldowns cooldowns,
         IReadOnlyList<BehaviourRun> runs, RivalRoster rivals, IReadOnlyList<RuleView> rules, RivalryOptions options, SquadMemory? memory,
-        Parties parties)
+        Parties parties, IReadOnlyList<WaitingView> waiting)
     {
         double now = world.GameHours;
-        string FactionName(int f) => f >= 0 && f < data.Factions.Count ? data.Factions[f].Name : "no faction";
+        string FactionName(int f) => data.FactionAt(f)?.Name ?? "no faction";
+        var squads = world.Squads.All.Where(s => !s.Dead).ToLookup(s => s.Faction);
 
         return new DebugView(
             now,
             options.HuntThreshold,
             [.. report.Characters.Select(c => (c.Id, c.Name, c.Down))],
             [.. report.Towns.Select(t => (t.Number, t.Name))],
-            [.. ledger.Entries.Select(g => Grudge(world, g.Key, g.Value, ledger, cooldowns, memory, FactionName(g.Key.Faction)))],
+            [.. ledger.Entries.Select(g => Grudge(world, g.Key, g.Value, ledger, cooldowns, memory, squads, FactionName(g.Key.Faction)))],
             [.. runs.Select(r => Run(r, now, FactionName(r.Faction)))],
             rules,
             [.. cooldowns.Entries.Where(c => c.Value > now).Select(c => (c.Key, c.Value - now))],
             [.. data.Factions.Select(f => (f.Name, rivals.HoursSinceEnded(f.Id, now))).Where(l => double.IsFinite(l.Item2))],
             [.. parties.Out(runs, report, now)],
             Rivalry.Parties.Cap(PartyKind.Friendly, options),
-            parties.Overrides);
+            parties.Overrides,
+            parties.RestUntil,
+            waiting);
     }
 
     /// <summary>
-    /// One grudge with its squads and the grudge director's cooldown (its key: <c>rivalry.grudge/{faction}:{name}</c>).
+    /// One grudge with the faction's living squads (<paramref name="squads"/>) marked to hunt the character and the grudge director's cooldown
+    /// (its key: <c>rivalry.grudge/{faction}:{name}</c>).
     /// </summary>
-    static GrudgeView Grudge(World world, GrudgeKey key, float value, NotorietyLedger ledger, Cooldowns cooldowns, SquadMemory? memory, string faction)
+    static GrudgeView Grudge(World world, GrudgeKey key, float value, NotorietyLedger ledger, Cooldowns cooldowns, SquadMemory? memory,
+        ILookup<int, Squad> squads, string faction)
     {
-        string name = world.Characters.TryResolveNext(key.Who, out int slot) ? world.Characters.Cold(slot)?.Name ?? "" : "";
-        int marked = memory is null
-            ? 0
-            : world.Squads.All.Count(s => s.Faction == key.Faction && !s.Dead && memory.HasShort(world, s.Id, key.Who, MemoryTag.TempEnemy));
-        string cooldown = $"rivalry.grudge/{key.Faction}:{name}";
-        double again = cooldowns.Entries.FirstOrDefault(c => c.Key == cooldown).Value - world.GameHours;
+        string name = world.Characters.NameOf(key.Who);
+        int marked = memory is null ? 0 : squads[key.Faction].Count(s => memory.HasShort(world, s.Id, key.Who, MemoryTag.TempEnemy));
+        double again = cooldowns.Until($"rivalry.grudge/{key.Faction}:{name}") - world.GameHours;
         return new GrudgeView(faction, key.Who, name, value, ledger.HeldFloor(key.Faction, key.Who), marked, Math.Max(0, again));
     }
 
@@ -184,14 +188,16 @@ public sealed record DebugView(
     }
 
     /// <summary>
-    /// The parties out against each cap, and the mods allowed over the hostile one.
+    /// The parties out against each cap, the hostile candidates waiting their turn, and the mods allowed over the hostile cap.
     /// </summary>
     public string DescribeParties()
     {
         string hostile = PartiesOf(PartyKind.Hostile, Rivalry.Parties.HostileCap);
         string friendly = PartiesOf(PartyKind.Friendly, FriendlyCap);
         string overrides = Overrides.Count > 0 ? $"; over the hostile cap: {string.Join(", ", Overrides)}" : "";
-        return $"hostile parties {hostile}; friendly parties {friendly}{overrides}";
+        string rest = RestUntil > GameHours ? $" (resting {Hours(RestUntil - GameHours)} more)" : "";
+        string waiting = Waiting.Count > 0 ? $"; waiting: {string.Join(", ", Waiting)}" : "";
+        return $"hostile parties {hostile}{rest}{waiting}; friendly parties {friendly}{overrides}";
     }
 
     /// <summary>

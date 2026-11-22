@@ -129,7 +129,7 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
     /// </summary>
     static string DescribeRivals(RivalrySystem? system)
     {
-        if (system is null) return "no world yet";
+        if (system is null) return NoWorld;
 
         var lines = system.Rivals.Describe().ToList();
         return lines.Count > 0 ? string.Join("; ", lines) : "no rival leaders yet";
@@ -184,7 +184,8 @@ public sealed class RivalryMod : IMod, IRivalryApi, IModDependents
     /// <summary>One status line from the latest report (read on the host's thread: the report and history are immutable snapshots).</summary>
     static string Describe(RivalrySystem? system)
     {
-        if (system is null) return "no world yet";
+        if (system is null) return NoWorld;
+
         var r = system.Report;
         var towns = string.Join("; ", r.Towns.Select(t => $"{t.Name}: {t.Buildings} bldg worth {t.BuildingValue}, {t.StoredValue} stored, defence {t.Defence:0} vs threat {t.Threat:0}"));
         string last = system.History.Count > 0 ? system.History[^1] : "no decisions yet";

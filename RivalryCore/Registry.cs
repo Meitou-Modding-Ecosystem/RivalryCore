@@ -120,6 +120,12 @@ public sealed class Rule
     public Func<Assessment, RuleTarget, int>? Faction { get; init; }
 
     /// <summary>
+    /// The grudge a hostile start of this rule scores with (docs/rivalry-core.md "Who goes next"); null: the acting faction's grudge against the
+    /// target's character, or the largest against the player characters in its town (<see cref="Assessment.GrudgeAt"/>).
+    /// </summary>
+    public Func<Assessment, RuleTarget, float>? Grudge { get; init; }
+
+    /// <summary>
     /// The behaviour's arguments; null: none.
     /// </summary>
     public Func<Assessment, RuleTarget, BehaviourArgs>? Args { get; init; }

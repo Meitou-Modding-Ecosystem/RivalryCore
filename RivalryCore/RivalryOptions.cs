@@ -44,6 +44,22 @@ public sealed class RivalryOptions
         Min = Parties.FriendlyMin, Max = Parties.FriendlyMax, Step = 1)]
     public int FriendlyPartiesAtOnce { get; set; } = 3;
 
+    [Setting("Rest between hunts, at least (game hours)", Hint = "After a hostile party ends, none comes for at least this long.",
+        Min = 0, Max = Parties.RestMax, Step = 1)]
+    public int HuntRestMinHours { get; set; } = 12;
+
+    [Setting("Rest between hunts, at most (game hours)", Hint = "The rest is a random whole number of hours from the floor to this.",
+        Min = 0, Max = Parties.RestMax, Step = 1)]
+    public int HuntRestMaxHours { get; set; } = 12;
+
+    [Setting("Hunt points lost per travel hour", Hint = "Who goes next: a hunter's grudge counts this much less for each hour it must travel to you.",
+        Min = 0, Max = 10, Step = 0.5)]
+    public float HuntTravelWeight { get; set; } = 2;
+
+    [Setting("Hunt points per hour waited", Hint = "Who goes next: a hunter held back gains this much for each hour it has waited its turn.",
+        Min = 0, Max = 10, Step = 0.5)]
+    public float HuntWaitWeight { get; set; } = 1;
+
     [Setting("Opportunist raid chance per day", Min = 0, Max = 2, Step = 0.05)]
     public float RaidChancePerDay { get; set; } = 0.25f;
 
@@ -126,7 +142,22 @@ public sealed class RivalryOptions
     public float HuntRadius { get; set; } = 20000;
     public float HuntHours { get; set; } = 24;
     public double HuntCooldownHours { get; set; } = 48;
-    public int MaxHuntsPerAssessment { get; set; } = 2;
+
+    /// <summary>
+    /// How many of the largest grudges the grudge director (<see cref="GrudgeDirector"/>) proposes as hostile candidates at each assessment.
+    /// It does not decide how many go: the hostile party cap and who goes next do (docs/rivalry-core.md "Who goes next").
+    /// </summary>
+    public int GrudgeCandidatesPerAssessment { get; set; } = 8;
+
+    /// <summary>
+    /// The old name of <see cref="GrudgeCandidatesPerAssessment"/>, as a quarter of it (it used to cap the hunts sent per assessment).
+    /// </summary>
+    [Obsolete("Use GrudgeCandidatesPerAssessment: this no longer limits the hunts sent, only the grudges proposed (4 per unit).")]
+    public int MaxHuntsPerAssessment
+    {
+        get => GrudgeCandidatesPerAssessment / 4;
+        set => GrudgeCandidatesPerAssessment = value * 4;
+    }
 
     /// <summary>
     /// What a hunter says when it starts a fight with anyone but its quarry; <c>{target}</c> is the quarry's name.

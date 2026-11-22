@@ -32,6 +32,11 @@ public sealed class NotorietyLedger
 
     public int Count => _grudges.Count;
 
+    /// <summary>
+    /// How many grudges have been started (a key that had none), ever: a cheap sign that someone new is held a grudge against.
+    /// </summary>
+    public int Started { get; private set; }
+
     /// <summary>Every grudge, in key order.</summary>
     public IEnumerable<KeyValuePair<GrudgeKey, float>> Entries => _grudges;
 
@@ -56,8 +61,14 @@ public sealed class NotorietyLedger
         if (faction < 0 || who.IsNone || !float.IsFinite(delta)) return;
         var key = new GrudgeKey(faction, who);
         float value = Math.Max(_grudges.GetValueOrDefault(key) + delta, _floors.GetValueOrDefault(key));
-        if (value < Floor) Forget(key);
-        else _grudges[key] = value;
+        if (value < Floor)
+        {
+            Forget(key);
+            return;
+        }
+
+        if (!_grudges.ContainsKey(key)) Started++;
+        _grudges[key] = value;
     }
 
     /// <summary>

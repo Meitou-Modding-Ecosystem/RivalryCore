@@ -59,8 +59,10 @@ public static class FactionBases
         if (faction < 0 || faction >= data.Factions.Count) return [];
 
         var cache = Caches.GetValue(data, d => new Cache(d));
-        IReadOnlyList<FactionBase>[] kinds = [Named(data, named), Owned(data, faction), cache.Spawning(faction), cache.Regions(faction)];
-        return kinds.FirstOrDefault(k => k.Count > 0) ?? [];
+        if (Named(data, cache, named) is { Count: > 0 } byName) return byName;
+        if (Owned(data, faction) is { Count: > 0 } owned) return owned;
+
+        return cache.Spawning(faction) is { Count: > 0 } spawning ? spawning : cache.Regions(faction);
     }
 
     /// <summary>
@@ -99,26 +101,37 @@ public static class FactionBases
             .Select(s => Site(s, BaseSource.Owned))];
 
     /// <summary>
-    /// The placed towns, and the cells of the regions, whose name is one of <paramref name="names"/> (any case).
+    /// The placed towns, and the cells of the regions (in map order), whose name is one of <paramref name="names"/> (any case).
     /// </summary>
-    static List<FactionBase> Named(PopulationData data, IReadOnlyList<string> names)
+    static List<FactionBase> Named(PopulationData data, Cache cache, IReadOnlyList<string> names)
     {
         if (names.Count == 0) return [];
 
         bool Listed(string name) => names.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
         var towns = data.Sites.Where(s => Listed(s.Town.Name)).Select(s => Site(s, BaseSource.Named));
-        return [.. towns, .. Cells(data, g => Listed(g.Name), BaseSource.Named)];
+        var cells = names
+            .SelectMany(cache.NamedCells)
+            .DistinctBy(c => c.Index)
+            .OrderBy(c => c.Index)
+            .Select(c => c.Base);
+        return [.. towns, .. cells];
     }
 
     /// <summary>
     /// A site as a base.
     /// </summary>
-    static FactionBase Site(TownSite s, BaseSource source) => new(new Vector2(s.Position.X, s.Position.Z), s.Index, source, s.Town.Name);
+    static FactionBase Site(TownSite s, BaseSource source) => new(s.Position.Flat(), s.Index, source, s.Town.Name);
 
     /// <summary>
     /// The centres of the map cells whose region matches.
     /// </summary>
-    static IEnumerable<FactionBase> Cells(PopulationData data, Func<BiomeGroupData, bool> match, BaseSource source)
+    static IEnumerable<FactionBase> Cells(PopulationData data, Func<BiomeGroupData, bool> match, BaseSource source) =>
+        IndexedCells(data, match, source).Select(c => c.Base);
+
+    /// <summary>
+    /// The map cells whose region matches, each with its index in map order.
+    /// </summary>
+    static IEnumerable<(int Index, FactionBase Base)> IndexedCells(PopulationData data, Func<BiomeGroupData, bool> match, BaseSource source)
     {
         if (data.Biomes is not { } biomes) yield break;
 
@@ -128,7 +141,7 @@ public static class FactionBases
             {
                 if (biomes.GroupOf(cx, cz) is not (>= 0 and var g) || !match(biomes.Groups[g])) continue;
 
-                yield return new FactionBase(CellCentre(cx, cz), -1, source, biomes.Groups[g].Name);
+                yield return (cz * WeatherAreas.Cells + cx, new FactionBase(CellCentre(cx, cz), -1, source, biomes.Groups[g].Name));
             }
         }
     }
@@ -157,6 +170,17 @@ public static class FactionBases
         /// Per faction, the cells of regions whose homeless spawns are its templates.
         /// </summary>
         readonly Lazy<Dictionary<int, List<FactionBase>>> _regions = new(() => BuildRegions(data));
+
+        /// <summary>
+        /// The cells of each region as a named base, by region name (any case): a faction with <see cref="RivalryOptions.Homes"/> asks at every
+        /// travel time, and a walk of the whole map each time is too slow.
+        /// </summary>
+        readonly Lazy<Dictionary<string, List<(int Index, FactionBase Base)>>> _named = new(() => BuildNamed(data));
+
+        /// <summary>
+        /// The cells of the regions with the name (any case), each with its index in map order.
+        /// </summary>
+        public IReadOnlyList<(int Index, FactionBase Base)> NamedCells(string name) => _named.Value.GetValueOrDefault(name) ?? [];
 
         /// <summary>
         /// The towns that spawn the faction's squads.
@@ -195,6 +219,22 @@ public static class FactionBases
             {
                 var cells = Cells(data, g => g.Id == group.Id, BaseSource.Region).ToList();
                 foreach (int f in Factions(data, group.HomelessSpawns, null).Distinct()) Add(map, f).AddRange(cells);
+            }
+
+            return map;
+        }
+
+        /// <summary>
+        /// Every region cell as a named base, by its region's name.
+        /// </summary>
+        static Dictionary<string, List<(int Index, FactionBase Base)>> BuildNamed(PopulationData data)
+        {
+            var map = new Dictionary<string, List<(int Index, FactionBase Base)>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var cell in IndexedCells(data, _ => true, BaseSource.Named))
+            {
+                if (!map.TryGetValue(cell.Base.Label, out var list)) map[cell.Base.Label] = list = [];
+
+                list.Add(cell);
             }
 
             return map;

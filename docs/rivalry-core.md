@@ -1,6 +1,7 @@
 # Rivalry Core (framework mod)
 
-**Status: proposed, mod version 0.6.0, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
+**Status: proposed, mod version 0.6.7, code-mod API 3. Needs Meitou 0.22.2 or later** (`gameVersion` `>=0.22.2`, "Building"); Meitou
+0.22.1 and earlier refuse it (0.6.4 to 0.6.6 run on 0.22.0 and 0.22.1; 0.6.0 named no game version). A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
 inspect the player's setup and act on it: hunt a character, raid a weak rich town, reinforce a town that is losing a fight. Not rival-only: the
 same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
 target kinds, behaviours, rules and directors (see "Extension API"; how-to: [depending on Rivalry Core](depending-on-rivalry-core.md)). Needs the engine hooks of [modding](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding.md) "World hooks".
@@ -63,14 +64,16 @@ director and key.
 | rule | `rivalry.reinforce` | town `rivalry.losing`: `rivalry.reinforce` by the closest ally (relation ≥ 50; allies with a DEFEND_TOWN campaign first); once per town per 12 h |
 | rule | `rivalry.opportunist` | town `rivalry.tempting`, chance `RaidChancePerDay`: `rivalry.raid` by the most hostile faction that has an assault campaign; once per town per 96 h |
 | rule | `rivalry.hit-squad` | a standing character against whom a faction's grudge is ≥ `HuntThreshold`: `rivalry.pursue` with that faction's own squad (see "Hit squads of any faction"); once per character per 48 h |
-| director | `rivalry.grudge` | a non-allied faction's grudge on a standing character ≥ `HuntThreshold` (60) and a squad of it within `HuntRadius`: `Hunt` with `HuntSquads` squads (none near: nothing, no cooldown); largest first, at most 2 per assessment, once per faction and character name per 48 h, while the hostile cap admits one |
+| director | `rivalry.grudge` | a non-allied faction's grudge on a standing character ≥ `HuntThreshold` (60) and a squad of it within `HuntRadius`: `Hunt` with `HuntSquads` squads (none near: nothing, no cooldown); the largest `GrudgeCandidatesPerAssessment` (8; it sets how many are proposed, not how many go) are hostile candidates with no travel (see "Who goes next"); once per faction and character name per 48 h |
 
 ## Rules
 
 A `Rule`: `Name`, `Target` kind (default `rivalry.town`), named `Conditions` and an optional `When` test, `Behaviour`, `ChancePerDay` (null:
 always; spread over the assessments), `CooldownHours`, `Faction` picker (-1 skips the target), `Args`, `Notice`, `Enabled`. Per target, in the
-kind's order: not cooling, conditions hold, roll (`Assessment.Roll("{rule}/{key}")`) passes, the party cap admits one more of the behaviour's
-kind, a faction is found; then the cooldown `{rule}/{key}` is claimed and the start recorded. A rule held by its cap keeps its cooldown free. Rules are code only; no data file.
+kind's order: not cooling, conditions hold, roll (`Assessment.Roll("{rule}/{key}")`) passes, a faction is found. A hostile start then becomes
+a candidate (see "Who goes next", scored on `Grudge`, default `Assessment.GrudgeAt`); any other needs the party cap to admit one more of the
+behaviour's kind. Then the cooldown `{rule}/{key}` is claimed and the start recorded. A rule held by its cap, or still waiting its turn, keeps
+its cooldown free. Rules are code only; no data file.
 
 ## Behaviours
 
@@ -89,9 +92,12 @@ has passed or the platoon is gone. **Unknown**: everything in play (see "Evidenc
 
 ### Driving a squad
 
-`SquadDriver`, for a behaviour that walks its squad itself instead of giving it a package: `Hold` (`PopulationSystem.HoldPlatoon` and
-`CharacterCold.Engaged` on each member, optionally the Sneak order), `Keep` (holds again; a hold is not saved, so driven runs call it every
-step), `GiveBack`, `Able` (members that can act), `WalkTo` (true within 20; a walk under way is left alone unless `redirect`) and `RollSkills`:
+`SquadDriver`, for a behaviour that walks its squad itself instead of giving it a package: `Hold` (`PopulationSystem.HoldPlatoon`, which
+since Meitou 0.22.2 holds the platoon off screen only, optionally the Sneak order; giving it back restores the members' move speed), `Keep`
+(holds again; a hold is not saved, so driven runs call it every step), `GiveBack`, `Able` (members that can act), `FirstLiving`, `WalkTo`
+(a move order, `World.GiveOrder` with `MoveCusOrdered`, which keeps the AI off the member while it runs, at run or walk speed; true within 20;
+a move under way is left alone unless `redirect` and its goal is more than `RedirectSlack` (10) from the new point, since each new move asks
+for a fresh path) and `RollSkills`:
 a number argument named `<skill>Min` (and `<skill>Max`), the skill a `StatsEnumerated` name in any case (`stealthMin`, `martialArtsMax`),
 gives every member that skill uniformly in the range when the squad loads. A run that ends, or whose squad unloads, gives the platoon back.
 
@@ -192,18 +198,54 @@ the setting "Friendly parties at once" (`FriendlyPartiesAtOnce`, 1 to 10, defaul
 | Friendly | the same for friendly runs; a `Reinforce` that queued a campaign or sent squads, as a raid | `rivalry.visit`, `rivalry.reinforce`, `Decisions.Reinforce` |
 
 - One gate: every decision is checked when it is carried out, after the decisions before it in the same assessment; one over its cap is
-  logged `held: <what> would be hostile party 2 of 1` and dropped. Rules (`RuleEngine`) and `rivalry.grudge` ask first
-  (`Assessment.MayStart(kind, source)`, which counts the decisions recorded so far), so a held start spends no cooldown. A dependent's director
-  should ask too.
+  logged `held: <what> would be hostile party 2 of 1` and dropped. Hostile starts of rules and `rivalry.grudge` go through "Who goes next";
+  friendly ones ask first (`Assessment.MayStart(kind, source)`, which counts the decisions recorded so far), so a held start spends no
+  cooldown. A dependent's director proposes hostile parties (`Assessment.Propose`) and asks `MayStart` for friendly ones.
 - The cap is a constant, not an option: a dependent cannot raise it by setting a value. The only way over it is
   `IRivalryRegistry.ExceedHostileCap(source, extra, reason)` in `Initialize`: starts by that source (a rule, director or claim source of the
   registering mod) may go `extra` over; they still count for everyone else. Overrides show in `Rivalry: parties`.
-- Debug rows (`fire rule`, `visit town`) skip the caps.
+- **Rest between hunts**: when the last hostile party ends (its run stops being `Underway`, its ledger entry expires, its claim is released or
+  lapses; an offer never confirmed does not count, see "Who goes next"), no hostile party starts or is claimed for a whole number of game hours
+  rolled uniformly between the settings "Rest between hunts, at least" (`HuntRestMinHours`, default 12) and "at most" (`HuntRestMaxHours`,
+  default 12), each 0 to 168; a ceiling under the floor counts as the floor. Checked every slow step; the roll is the world's hashed RNG.
+  Friendly parties don't rest; overrides don't skip it. A held start logs `held: resting after the last hostile party until <hour> h`;
+  `IRivalryState.HostileRestUntil` gives the hour.
+- Debug rows (`fire rule`, `visit town`) skip the caps and the rest.
 - A mod running a party itself (not as a Rivalry behaviour) counts it with `IRivalryState.ClaimParty(new PartyClaim(source, kind, key, hours,
-  faction))`: true when it holds, false when the cap is full (send nothing; ask again later). Renew with the same source and key while the
-  party is out; release with `ReleaseParty(source, key)`; an unrenewed claim lapses after `hours`, so a removed mod frees its slot.
+  faction))`: true when it holds, false when the cap is full or (hostile) the rest runs (send nothing; ask again later). Renew with the
+  same source and key while the party is out (a renewal always holds); release with `ReleaseParty(source, key)`; an unrenewed claim lapses
+  after `hours`, so a removed mod frees its slot. A hostile claim that ends starts the rest.
 - `IRivalryState.Parties` (a copy), `PartiesOut(kind)` and `PartyCap(kind)` show what is out. `Custom` and `Direct` decisions are not counted:
   send parties through a behaviour, a hunt or raid decision, or a claim.
+
+## Who goes next
+
+When several hostile parties could go, each is a `HostileCandidate(Source, Key, Faction, Grudge, TravelHours, ClaimHours = 6)` and scores
+
+`score = grudge − HuntTravelWeight × travel hours + HuntWaitWeight × hours waited`
+
+with the settings "Hunt points lost per travel hour" (`HuntTravelWeight`, default 2) and "Hunt points per hour waited" (`HuntWaitWeight`,
+default 1), each 0 to 10. Code: `HuntQueue`.
+
+- Grudge: a rule's `Grudge`, else `Assessment.GrudgeAt(faction, target)` (the faction's grudge against the character, or the largest against
+  the player characters in the town); `rivalry.grudge` uses the grudge it acts on.
+- Travel: `Assessment.TravelHours(faction, position, home)`, the same rule as a hit squad's road time (`Travel`, "Pursue"): from the faction's
+  base nearest the target, at most `HuntTravelMaxHours`; no base: `HuntTravelFallbackHours`. A hunt by squads already near (`rivalry.grudge`)
+  and a rule with no faction travel 0.
+- Waited: game hours since the candidate (`Source|Key`) was first proposed. It keeps its place while proposed again within
+  `HuntQueue.ForgetHours` (24 h), so a failed chance roll does not reset it; one that goes starts afresh. Saved and hashed.
+- After the rules and directors, the candidates are ranked by score, then grudge, then the longer wait, then source and key (ordinal); each
+  in turn is sent when `MayStart(Hostile, source)` admits it (one while the cap is one and no override applies), and the rest wait. Sending
+  runs the proposer's dispatch: a rule claims its cooldown and records its start, `rivalry.grudge` claims its cooldown and marks squads.
+- Example: a grudge of 60 two hours away scores 56 and goes before a grudge of 80 twenty hours away (40); the far one, still proposed, scores
+  70 thirty hours later and goes next.
+- Another mod's party (e.g. TWR's crews) joins with `IRivalryState.Propose(candidate)`, with `TravelHours(faction, character)` for the
+  travel: false while it waits; when it wins at an assessment it is offered a hostile claim (source and key as the candidate's) for one
+  assessment (`AssessEveryHours`), and the next `Propose` returns true and confirms it for `ClaimHours` (a `ClaimParty` renewal confirms it
+  too). An offer fills the cap like any claim, but one released or lapsed before it is confirmed starts no rest: the mod sent nothing.
+  Propose at least every assessment while it wants to go (unproposed for 2 × `AssessEveryHours` it is dropped); renew with `ClaimParty`
+  while it is out, release with `ReleaseParty`, also when it won but will not send the party after all.
+- `IRivalryState.Waiting` and `Rivalry: parties` show the candidates still waiting, best first, with score and hours waited.
 
 ## Extension API
 
@@ -234,7 +276,7 @@ public void Initialize(ModContext c)
 | `AddTarget` | a target kind: lists `RuleTarget`s (stable `Key`, town, character, site) in a fixed order |
 | `AddBehaviour` | an `IBehaviour` |
 | `AddRule` | a `Rule`, evaluated after those added before |
-| `AddDirector` | an `IDirector` (`Assess(assessment, decisions)`), asked after the rules; `decisions.Start(behaviour, target, args)` starts a behaviour |
+| `AddDirector` | an `IDirector` (`Assess(assessment, decisions)`), asked after the rules; `decisions.Start(behaviour, target, args)` starts a behaviour; a hostile party is proposed with `assessment.Propose(candidate, dispatch)` |
 | `ExceedHostileCap` | leave for one source to go over the hostile cap (see "Party caps") |
 
 - Registrations only before the first world (in `Initialize`); a duplicate or unprefixed name throws. Rivalry Core implements
@@ -271,18 +313,20 @@ director marks (no run) do not speak.
 ## Options
 
 The switches, assessment period, grudge cooling per hour, hunt threshold, hit squad travel at most, reinforce balance, friendly parties at
-once, raid chance and
+once, rest between hunts (floor and ceiling), the hunt points per travel hour and per hour waited, raid chance and
 `Announce` (a message per decision) are on the Mod settings page. Everything else in `RivalryOptions` is for dependents. The system copies the options in `Inputs` each tick.
 
 ## Save data
 
-Sidecar system `rivalry`, version 4 (1 to 3 still load): next/last assessment hours, grudges by faction string id and character name +
-record id (slots change on load; restored to the first living match in slot order at the first step after the load, unmatched ones dropped),
+Sidecar system `rivalry`, version 7 (1 to 6 still load): next/last assessment hours, grudges by faction string id and character name + record
+id (slots change on load; restored to the first living match in slot order at the first step after the load, unmatched ones dropped),
 cooldowns; since version 2 the next run id and each run (faction by string id, args, and its platoon as template + position: platoon ids change
 on load, so a loaded run takes the nearest platoon of that template and faction no other run holds); since version 3 each grudge's held floor
-and the rival roster (its own layout version 1: leaders, reckonings, each faction's last hit squad hour); since version 4, last, the party
-ledger (kind, source, what, key, faction by string id, town, campaign flag, until). Kill watches are not saved. A renamed
-character loses its grudges across a save made before the rename.
+and the rival roster (its own layout version 1: leaders, reckonings, each faction's last hit squad hour); since version 4 the party ledger
+(kind, source, what, key, faction by string id, town, campaign flag, until); since version 5 the rest between hunts (whether a hostile party
+was out, the hour the rest ends); since version 6 the hostile candidates' waits (id, first proposed hour, last proposed hour); since version 7,
+last, which ledger claims are unconfirmed offers (count, then a flag per ledger entry). Other mods' candidates are not saved: they propose
+again. Kill watches are not saved. A renamed character loses its grudges across a save made before the rename.
 
 ## Debug rows (F10)
 
@@ -323,7 +367,7 @@ Both are hostile parties, so a grudge from Reavers starts whichever comes first;
 | `Rivalry: character` | `[name]` | for the named character (any case), else the selected ones, else everyone with a grudge or a hit squad: notoriety, each faction's grudge, the squads hunting them, the rules resting on them |
 | `Rivalry: assess now` | none | runs the inspection, rules and directors at the next tick instead of waiting for the period (2 h) |
 | `Rivalry: runs and rules` | none | the runs under way in words, the parties against their caps, and every rule with what it aims at |
-| `Rivalry: parties` | none | hostile and friendly parties out against their caps (`hostile parties 1/1 (rivalry.hit-squad run 3 -> Zimm)`), and the overrides |
+| `Rivalry: parties` | none | hostile and friendly parties out against their caps (`hostile parties 1/1 (rivalry.hit-squad run 3 -> Zimm)`), the hostile candidates waiting (`waiting: rivalry.hit-squad -> Zimm 31 (waited 4 h)`), and the overrides |
 | `Rivalry: rival leaders` | none | each named leader's record and fate, and the leaders handed to the law |
 | `Rivalry: faction bases` | `faction` | how the faction's bases were found, their count and the five nearest the first player character |
 | `Rivalry: grudge on selected` | `faction[, amount]` | adds `amount` to the faction's grudge against each selected character. Nothing else happens until the next assessment |
@@ -383,6 +427,12 @@ Hand its `AshenHand.mod`); `rule X threw: ...`. A rule fired this way does not s
 a visit are the game's own, read in FCS.
 
 ## Building
+
+Built against the released game players run: the `engine` submodule is pinned to Meitou's release tag (`v0.22.2`; until that
+release exists, the nightly tag `v0.22.2-nightly.20261122.2`), and `Directory.Build.rsp` stamps the engine assemblies as `0.22.2.0`, the
+oldest release the mod supports (`gameVersion` `>=0.22.2` in `meitou.json`). Without the stamp the submodule builds them as `1.0.0.0`; .NET never binds a reference to an older assembly, so the
+released game refuses the mod ("entry type ... is not in its assemblies"). The mod's own assembly keeps its manifest version
+(`Directory.Build.props`). A newer game release that changes an engine call the mod makes needs a new pin, stamp and range together.
 
 `dotnet build RivalryCore` writes `RivalryCore.dll` and `meitou.json`; the game assemblies are referenced with `Private="false"`. Copy both
 into `Kenshi/mods/RivalryCore/` beside an empty `RivalryCore.mod` made in FCS and enable it in `mods.cfg` above its dependents.

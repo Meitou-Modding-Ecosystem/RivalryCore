@@ -235,7 +235,7 @@ public sealed class VisitBehaviour : IBehaviour
         var world = context.World;
         if (context.Population is not { } population || context.Report.TownOf(run.Town) is not { } town) return false;
 
-        var at = new Vector2(town.Position.X, town.Position.Z);
+        var at = town.Position.Flat();
         int site = NearestSite(context.Data, at);
         int platoon = site < 0 ? -1 : population.SpawnPlatoon(world, run.Faction, run.Args.Text("template")!, site, at,
             (float)run.Args.Number("minRadius", 600), (float)run.Args.Number("maxRadius", 1200), (long)run.Args.Number("money"));
@@ -272,7 +272,7 @@ public sealed class VisitBehaviour : IBehaviour
         float bestDistance = float.MaxValue;
         foreach (var site in data.Sites)
         {
-            float d = Vector2.DistanceSquared(new Vector2(site.Position.X, site.Position.Z), at);
+            float d = Vector2.DistanceSquared(site.Position.Flat(), at);
             if (d < bestDistance) (best, bestDistance) = (site.Index, d);
         }
 

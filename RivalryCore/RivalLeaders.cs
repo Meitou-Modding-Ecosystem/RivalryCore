@@ -26,7 +26,7 @@ public static class RivalLeaders
     public static RivalLeader? Assign(BehaviourContext context, BehaviourRun run, Squad squad)
     {
         var world = context.World;
-        if (FactionId(context, run.Faction) is not { } faction || FirstLiving(world, squad) is not { PortraitSerial: { } serial } body) return null;
+        if (FactionId(context, run.Faction) is not { } faction || SquadDriver.FirstLiving(world, squad) is not { PortraitSerial: { } serial } body) return null;
 
         var names = Split(run.Args.Text("leaderNames"));
         if (names.Count == 0 && body.Name.Length > 0) names = [body.Name];   // no roster of names: the leader keeps the name it was made with
@@ -56,7 +56,7 @@ public static class RivalLeaders
     /// A faction's string id; null for none.
     /// </summary>
     public static string? FactionId(BehaviourContext context, int faction) =>
-        faction >= 0 && faction < context.Data.Factions.Count ? context.Data.Factions[faction].Id : null;
+        context.Data.FactionAt(faction)?.Id;
 
     #endregion
 
@@ -238,17 +238,6 @@ public static class RivalLeaders
         return null;
     }
 
-    /// <summary>
-    /// The squad's first living member's record.
-    /// </summary>
-    static CharacterCold? FirstLiving(World world, Squad squad)
-    {
-        var table = world.Characters;
-        foreach (var id in squad.Members)
-            if (table.TryResolveNext(id, out int slot) && table.Next[slot].Alive && table.Cold(slot) is { } c) return c;
-
-        return null;
-    }
 
     #endregion
 }

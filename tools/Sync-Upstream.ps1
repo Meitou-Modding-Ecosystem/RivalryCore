@@ -1,16 +1,16 @@
 <#
 .SYNOPSIS
-Pulls upstream MeitouClient (VlcekM) through the fork into MeitouMods: upstream -> engine master -> engine fork -> MeitouMods beta -> main.
+Pulls upstream MeitouClient (VlcekM) through the fork into RivalryCore: upstream -> engine master -> engine fork -> RivalryCore beta -> main.
 
 .DESCRIPTION
-Run from anywhere inside the MeitouMods checkout, in PowerShell 7. Each step checks where things stand first, so running the script again
+Run from anywhere inside the RivalryCore checkout, in PowerShell 7. Each step checks where things stand first, so running the script again
 after a stop picks up where it left off. Nothing is force-pushed; master only ever fast-forwards.
 
   Step 1 (Master): fast-forwards the fork's master to upstream/master (a push of upstream's commit; no local checkout needed).
   Step 2 (Fork):   merges master into fork on a branch sync/upstream-<date> and opens a PR into fork. When the merge conflicts it stops,
                    leaving the merge open in engine/ for you to resolve: fix the files, `git add` them, `git commit`, then run the script
                    again with -Step Fork; it pushes the branch and opens the PR.
-  Step 3 (Beta):   once the fork PR is merged, points MeitouMods' engine/ at fork's head on a branch engine/sync-<date> and opens a PR into beta.
+  Step 3 (Beta):   once the fork PR is merged, points RivalryCore's engine/ at fork's head on a branch engine/sync-<date> and opens a PR into beta.
   Step 4 (Main):   once you have tested beta, opens a PR beta -> main.
 
 With the GitHub CLI (`gh`, signed in) the PRs are opened for you; without it the script prints the links to open them.
@@ -83,7 +83,7 @@ function OpenPr([string]$repo, [string]$base, [string]$head, [string]$title, [st
 $root = GitOut rev-parse --show-superproject-working-tree
 if (-not $root) { $root = GitOut rev-parse --show-toplevel }
 Set-Location $root
-if (-not (Test-Path (Join-Path $root 'engine'))) { throw "Run this inside the MeitouMods checkout (no engine/ under $root)." }
+if (-not (Test-Path (Join-Path $root 'engine'))) { throw "Run this inside the RivalryCore checkout (no engine/ under $root)." }
 $engine = Join-Path $root 'engine'
 
 function InEngine([scriptblock]$body) {
@@ -199,7 +199,7 @@ function StepBeta {
         return
     }
     if ([bool](GitOut status --porcelain --untracked-files=no -- . ':!engine')) {
-        throw 'MeitouMods has uncommitted changes: commit or discard them first.'
+        throw 'RivalryCore has uncommitted changes: commit or discard them first.'
     }
     if (EngineMerging) { throw 'engine/ has a merge open: finish it (-Step Fork) or run -Abort first.' }
 
@@ -210,7 +210,7 @@ function StepBeta {
     Git add engine
     Git commit --quiet -m "Engine: pin fork $short (upstream sync)"
     Git push --quiet -u origin $branch
-    OpenPr 'MeitouMods' 'beta' $branch "Engine: pin fork $short (upstream sync)" `
+    OpenPr 'RivalryCore' 'beta' $branch "Engine: pin fork $short (upstream sync)" `
         "Points engine/ at fork $short, which holds the latest upstream. Merge once CI passes."
     Write-Host "Pushed $branch. Merge its PR into beta once CI passes, then come back to beta:" -ForegroundColor Green
     Write-Host '  git checkout beta; git pull; git submodule update --init engine'
@@ -223,7 +223,7 @@ function StepMain {
         Write-Host 'main already holds beta.' -ForegroundColor Green
         return
     }
-    OpenPr 'MeitouMods' 'main' 'beta' 'Promote beta to main' 'Promotes the tested beta (including the latest engine pin) to main.'
+    OpenPr 'RivalryCore' 'main' 'beta' 'Promote beta to main' 'Promotes the tested beta (including the latest engine pin) to main.'
 }
 
 EnsureEngineRemotes

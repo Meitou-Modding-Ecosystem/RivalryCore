@@ -1,7 +1,0 @@
-{
-  "id": "husbandry",
-  "version": "0.1.0",
-  "apiVersion": 2,
-  "assemblies": ["Husbandry.dll"],
-  "entry": "Husbandry.HusbandryMod"
-}

@@ -121,7 +121,7 @@ public sealed class Inspector(PopulationData data, IReadOnlyList<(string Name, F
 
     TownReport InspectTown(World world, int player, PlayerTown town, List<PlayerTown> towns, List<CharacterReport> characters)
     {
-        var (buildings, turrets, gates, research) = CountBuildings(world, town.Number);
+        var (buildings, turrets, gates, research, built) = CountBuildings(world, town.Number);
         var defenders = characters.Where(c => c.Town == town.Number).ToList();
         var (hostiles, threat) = FindHostiles(world, player, town, towns);
         float defence = defenders.Sum(c => c.Strength) + turrets * TurretDefence;
@@ -130,34 +130,31 @@ public sealed class Inspector(PopulationData data, IReadOnlyList<(string Name, F
         {
             Public = town.Public,
             Beds = world.Fixtures.All.Count(f => f.Kind == Meitou.Simulation.Locks.FixtureKind.Bed && f.Owner == player && TownAt(towns, f.Position) == town.Number),
-            BuildingValue = BuildingsValue(world, town.Number),
+            BuildingValue = built,
         };
     }
 
-    (int Buildings, int Turrets, int Gates, int Research) CountBuildings(World world, int town)
+    /// <summary>
+    /// The town's finished buildings by function, and what they (furniture included: beds, benches and storage are BUILDING records too) cost in
+    /// construction materials; one walk of the buildings.
+    /// </summary>
+    (int Buildings, int Turrets, int Gates, int Research, long Value) CountBuildings(World world, int town)
     {
         int buildings = 0, turrets = 0, gates = 0, research = 0;
+        long value = 0;
         foreach (var b in world.Buildings.All)
         {
             if (b.Town != town || !b.Complete || b.Destroyed || b.Ruined) continue;
+
             buildings++;
+            value += BuildingValueOf(b.Record);
             var (function, level) = FunctionOf(b.Record);
             if (function == TurretFunction) turrets++;
             else if (function == GateFunction) gates++;
             else if (function == ResearchFunction) research = Math.Max(research, level);
         }
-        return (buildings, turrets, gates, research);
-    }
 
-    /// <summary>
-    /// What the town's finished buildings (furniture included: beds, benches and storage are BUILDING records too) cost in construction materials.
-    /// </summary>
-    long BuildingsValue(World world, int town)
-    {
-        long total = 0;
-        foreach (var b in world.Buildings.All)
-            if (b.Town == town && b.Complete && !b.Destroyed && !b.Ruined) total += BuildingValueOf(b.Record);
-        return total;
+        return (buildings, turrets, gates, research, value);
     }
 
     /// <summary>
@@ -247,7 +244,7 @@ public sealed class Inspector(PopulationData data, IReadOnlyList<(string Name, F
     long Value(IEnumerable<ItemInstance> items)
     {
         long total = 0;
-        foreach (var item in items) total += (long)_market.BaseValue(item) * Math.Max(1, item.Quantity);
+        foreach (var item in items) total += ValueOf(item);
         return total;
     }
 
@@ -258,7 +255,7 @@ public sealed class Inspector(PopulationData data, IReadOnlyList<(string Name, F
         float bestDistance = float.MaxValue;
         foreach (var t in towns)
         {
-            float d = Vector2.Distance(new Vector2(at.X, at.Z), new Vector2(t.Position.X, t.Position.Z));
+            float d = Ground.FlatDistance(at, t.Position);
             if (d <= t.Radius && d < bestDistance) (best, bestDistance) = (t.Number, d);
         }
         return best;

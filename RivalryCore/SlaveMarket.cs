@@ -1,14 +1,25 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using Meitou.Data.Gameplay;
 
 namespace Rivalry;
 
 /// <summary>
 /// Who buys captives (docs/rivalry-core.md "Abduction"): a faction buys a race when the game's own data shows it keeping slaves of that race, that
-/// is when one of its squad templates lists a slave character of the race. Built once per world from the data.
+/// is when one of its squad templates lists a slave character of the race. Built once per data set from the data (<see cref="For"/>).
 /// </summary>
 public sealed class SlaveMarket(PopulationData data)
 {
+    /// <summary>
+    /// The market of each data set.
+    /// </summary>
+    static readonly ConditionalWeakTable<PopulationData, SlaveMarket> Markets = [];
+
+    /// <summary>
+    /// The data set's market, built on first use and kept with it: reading every faction's squad templates is too slow to repeat per step.
+    /// </summary>
+    public static SlaveMarket For(PopulationData data) => Markets.GetValue(data, d => new SlaveMarket(d));
+
     /// <summary>
     /// The races each faction keeps as slaves, by faction index; filled on first use.
     /// </summary>
@@ -32,7 +43,7 @@ public sealed class SlaveMarket(PopulationData data)
             int owner = site.Index < data.SiteFactions.Count ? data.SiteFactions[site.Index] : -1;
             if (owner < 0 || !Buys(owner, race) || data.Relations.Contains(owner) && data.Relations.IsHostile(owner, seller)) continue;
 
-            float d = Vector2.DistanceSquared(new Vector2(site.Position.X, site.Position.Z), new Vector2(from.X, from.Z));
+            float d = Vector2.DistanceSquared(site.Position.Flat(), from.Flat());
             if (d < bestDistance) (best, bestDistance) = (site.Index, d);
         }
 
