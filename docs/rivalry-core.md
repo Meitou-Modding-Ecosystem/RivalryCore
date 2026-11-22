@@ -1,6 +1,6 @@
 # Rivalry Core (framework mod)
 
-**Status: proposed, mod version 0.6.5, code-mod API 2. Needs Meitou 0.22.0 or 0.22.1** (`gameVersion` `>=0.22.0 <0.22.2`, "Building"); Meitou
+**Status: proposed, mod version 0.6.6, code-mod API 2. Needs Meitou 0.22.0 or 0.22.1** (`gameVersion` `>=0.22.0 <0.22.2`, "Building"); Meitou
 0.21 and earlier refuse it (0.6.0 named no game version). A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
 inspect the player's setup and act on it: hunt a character, raid a weak rich town, reinforce a town that is losing a fight. Not rival-only: the
 same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
@@ -202,11 +202,12 @@ the setting "Friendly parties at once" (`FriendlyPartiesAtOnce`, 1 to 10, defaul
 - The cap is a constant, not an option: a dependent cannot raise it by setting a value. The only way over it is
   `IRivalryRegistry.ExceedHostileCap(source, extra, reason)` in `Initialize`: starts by that source (a rule, director or claim source of the
   registering mod) may go `extra` over; they still count for everyone else. Overrides show in `Rivalry: parties`.
-- **Rest between hunts**: when the last hostile party ends (its run stops being `Underway`, its ledger entry expires, its claim is released
-  or lapses), no hostile party starts or is claimed for a whole number of game hours rolled uniformly between the settings "Rest between
-  hunts, at least" (`HuntRestMinHours`, default 12) and "at most" (`HuntRestMaxHours`, default 12), each 0 to 168; a ceiling under the floor
-  counts as the floor. Checked every slow step; the roll is the world's hashed RNG. Friendly parties don't rest; overrides don't skip it. A
-  held start logs `held: resting after the last hostile party until <hour> h`; `IRivalryState.HostileRestUntil` gives the hour.
+- **Rest between hunts**: when the last hostile party ends (its run stops being `Underway`, its ledger entry expires, its claim is released or
+  lapses; an offer never confirmed does not count, see "Who goes next"), no hostile party starts or is claimed for a whole number of game hours
+  rolled uniformly between the settings "Rest between hunts, at least" (`HuntRestMinHours`, default 12) and "at most" (`HuntRestMaxHours`,
+  default 12), each 0 to 168; a ceiling under the floor counts as the floor. Checked every slow step; the roll is the world's hashed RNG.
+  Friendly parties don't rest; overrides don't skip it. A held start logs `held: resting after the last hostile party until <hour> h`;
+  `IRivalryState.HostileRestUntil` gives the hour.
 - Debug rows (`fire rule`, `visit town`) skip the caps and the rest.
 - A mod running a party itself (not as a Rivalry behaviour) counts it with `IRivalryState.ClaimParty(new PartyClaim(source, kind, key, hours,
   faction))`: true when it holds, false when the cap is full or (hostile) the rest runs (send nothing; ask again later). Renew with the
@@ -237,9 +238,11 @@ default 1), each 0 to 10. Code: `HuntQueue`.
 - Example: a grudge of 60 two hours away scores 56 and goes before a grudge of 80 twenty hours away (40); the far one, still proposed, scores
   70 thirty hours later and goes next.
 - Another mod's party (e.g. TWR's crews) joins with `IRivalryState.Propose(candidate)`, with `TravelHours(faction, character)` for the
-  travel: false while it waits; when it wins at an assessment it is given a hostile claim of `ClaimHours` (source and key as the candidate's),
-  and the next `Propose` returns true (and renews the claim). Propose at least every assessment while it wants to go (unproposed for
-  2 × `AssessEveryHours` it is dropped); renew with `ClaimParty` while it is out, release with `ReleaseParty`.
+  travel: false while it waits; when it wins at an assessment it is offered a hostile claim (source and key as the candidate's) for one
+  assessment (`AssessEveryHours`), and the next `Propose` returns true and confirms it for `ClaimHours` (a `ClaimParty` renewal confirms it
+  too). An offer fills the cap like any claim, but one released or lapsed before it is confirmed starts no rest: the mod sent nothing.
+  Propose at least every assessment while it wants to go (unproposed for 2 × `AssessEveryHours` it is dropped); renew with `ClaimParty`
+  while it is out, release with `ReleaseParty`, also when it won but will not send the party after all.
 - `IRivalryState.Waiting` and `Rivalry: parties` show the candidates still waiting, best first, with score and hours waited.
 
 ## Extension API
@@ -313,15 +316,15 @@ once, rest between hunts (floor and ceiling), the hunt points per travel hour an
 
 ## Save data
 
-Sidecar system `rivalry`, version 6 (1 to 5 still load): next/last assessment hours, grudges by faction string id and character name +
-record id (slots change on load; restored to the first living match in slot order at the first step after the load, unmatched ones dropped),
+Sidecar system `rivalry`, version 7 (1 to 6 still load): next/last assessment hours, grudges by faction string id and character name + record
+id (slots change on load; restored to the first living match in slot order at the first step after the load, unmatched ones dropped),
 cooldowns; since version 2 the next run id and each run (faction by string id, args, and its platoon as template + position: platoon ids change
 on load, so a loaded run takes the nearest platoon of that template and faction no other run holds); since version 3 each grudge's held floor
-and the rival roster (its own layout version 1: leaders, reckonings, each faction's last hit squad hour); since version 4 the party
-ledger (kind, source, what, key, faction by string id, town, campaign flag, until); since version 5 the rest between hunts (whether
-a hostile party was out, the hour the rest ends); since version 6, last, the hostile candidates' waits (id, first proposed hour, last
-proposed hour). Other mods' candidates are not saved: they propose again. Kill watches are not saved. A renamed
-character loses its grudges across a save made before the rename.
+and the rival roster (its own layout version 1: leaders, reckonings, each faction's last hit squad hour); since version 4 the party ledger
+(kind, source, what, key, faction by string id, town, campaign flag, until); since version 5 the rest between hunts (whether a hostile party
+was out, the hour the rest ends); since version 6 the hostile candidates' waits (id, first proposed hour, last proposed hour); since version 7,
+last, which ledger claims are unconfirmed offers (count, then a flag per ledger entry). Other mods' candidates are not saved: they propose
+again. Kill watches are not saved. A renamed character loses its grudges across a save made before the rename.
 
 ## Debug rows (F10)
 

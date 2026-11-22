@@ -141,6 +141,12 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
         /// The game hour it stops counting (a claim's renewal moves it).
         /// </summary>
         public double Until { get; set; }
+
+        /// <summary>
+        /// A claim the queue offered to another mod's winning candidate (<see cref="Offer"/>) that the mod has not yet confirmed by proposing
+        /// or claiming again: it counts under the cap, but ending unconfirmed starts no rest.
+        /// </summary>
+        public bool Offered { get; set; }
     }
 
     /// <summary>
@@ -178,6 +184,12 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
     /// A ledger entry as a view.
     /// </summary>
     static PartyView View(LedgerEntry e) => new(e.Kind, e.Source, e.What, e.Key, e.Faction, 0);
+
+    /// <summary>
+    /// How many hostile offers (<see cref="Offer"/>) still count: they fill the cap but are left out of the rest's look.
+    /// </summary>
+    public int HostileOffers(PlayerReport report, double now) =>
+        _ledger.Count(e => e.Offered && e.Kind == PartyKind.Hostile && Alive(e, report, now));
 
     /// <summary>
     /// Drops the ledger entries that stopped counting.
@@ -224,11 +236,26 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
         if (_ledger.FirstOrDefault(e => e.What == ClaimWhat && e.Source == claim.Source && e.Key == claim.Key) is { } held)
         {
             held.Until = now + claim.Hours;
+            held.Offered = false;
             return true;
         }
         if (!Admits(claim.Kind, claim.Source, @out, options, now)) return false;
 
         _ledger.Add(new LedgerEntry(claim.Kind, claim.Source, ClaimWhat, claim.Key, claim.Faction, 0, false) { Until = now + claim.Hours });
+        return true;
+    }
+
+    /// <summary>
+    /// Offers a winning candidate of another mod its claim (<see cref="IRivalryState.Propose"/>) when the cap admits it: it counts for
+    /// <paramref name="hours"/> (one assessment) and becomes a full claim when the mod confirms it by proposing or claiming again. Whether it
+    /// was offered.
+    /// </summary>
+    public bool Offer(PartyClaim claim, int @out, RivalryOptions options, double now, double hours)
+    {
+        if (!Admits(claim.Kind, claim.Source, @out, options, now)) return false;
+
+        var entry = new LedgerEntry(claim.Kind, claim.Source, ClaimWhat, claim.Key, claim.Faction, 0, false) { Until = now + hours, Offered = true };
+        _ledger.Add(entry);
         return true;
     }
 
@@ -315,6 +342,7 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
             h.Add(Rng.StableHash(e.Key));
             h.Add(e.Faction);
             h.Add(e.Until);
+            h.Add(e.Offered ? 1 : 0);
         }
 
         h.Add(_hostileOut ? 1 : 0);
@@ -338,6 +366,28 @@ internal sealed class Parties(IReadOnlyDictionary<string, IBehaviour> behaviours
             w.Write(e.Campaign);
             w.Write(e.Until);
         }
+    }
+
+    /// <summary>
+    /// Which ledger entries are offers (<see cref="LedgerEntry.Offered"/>): the count, then a flag per entry in ledger order.
+    /// </summary>
+    public void WriteOffers(BinaryWriter w)
+    {
+        w.Write(_ledger.Count);
+        foreach (var e in _ledger) w.Write(e.Offered);
+    }
+
+    /// <summary>
+    /// Reads what <see cref="WriteOffers"/> wrote; a count that does not match the ledger leaves every entry confirmed.
+    /// </summary>
+    public void ReadOffers(BinaryReader r)
+    {
+        int count = r.ReadInt32();
+        var flags = new bool[count];
+        for (int i = 0; i < count; i++) flags[i] = r.ReadBoolean();
+        if (count != _ledger.Count) return;
+
+        for (int i = 0; i < count; i++) _ledger[i].Offered = flags[i];
     }
 
     /// <summary>

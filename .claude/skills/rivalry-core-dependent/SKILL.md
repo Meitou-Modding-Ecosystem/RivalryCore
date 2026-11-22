@@ -51,7 +51,8 @@ copies or replaces it. Read `docs/depending-on-rivalry-core.md` first, and `docs
    against the target should not rank it.
 8. **Own pursuit code** (e.g. TWR's crews): each assessment, `Propose(new HostileCandidate(source, key, faction, grudge,
    state.TravelHours(faction, who), ClaimHours: hours))`; false means it waits, send nothing. True: it holds a claim; send, renew with
-   `ClaimParty` within `hours` while out, `ReleaseParty` when done. Key: stable across loads (a character's name, `town{n}`).
+   `ClaimParty` within `hours` while out, `ReleaseParty` when done, or at once if it won but you won't send it (a win is an offer for one
+   assessment until that `true`; an unconfirmed one starts no rest). Key: stable across loads (a character's name, `town{n}`).
 9. **Docs**: describe the mod's rules, args and settings in `docs/<mod>.md`; a change to Rivalry Core's API updates `docs/rivalry-core.md`
    and `docs/depending-on-rivalry-core.md`, bumps its minor version and its dependents' ranges in the same PR.
 10. **Check**: `dotnet build` (warnings are errors), `dotnet test`; in game, F10 `Rivalry: runs and rules`, `Rivalry: parties`,

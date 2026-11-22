@@ -524,6 +524,77 @@ public class RivalryCoreTests
         Assert.True(system.ClaimParty(new PartyClaim("test.guests", PartyKind.Friendly, "town1", 100)));   // friendly parties don't rest
     }
 
+    /// <summary>
+    /// Another mod's candidate that wins an assessment, as an unconfirmed offer.
+    /// </summary>
+    static (SimWorld World, RivalrySystem System, HostileCandidate Bounty) Offered()
+    {
+        var (world, system) = MakeSending(_ => { });
+        world.RunTicks(1);
+        var bounty = new HostileCandidate("twr.bounty", "Me", -1, 200, 0);
+        Assert.False(system.Propose(bounty));
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+        Assert.Equal("twr.bounty", Assert.Single(system.Parties).Source);
+        return (world, system, bounty);
+    }
+
+    [Fact]
+    public void An_offer_released_before_it_is_confirmed_frees_the_slot_without_a_rest()
+    {
+        var (world, system, _) = Offered();
+
+        Assert.True(system.ReleaseParty("twr.bounty", "Me"));
+        world.RunTicks(1);
+
+        Assert.True(system.HostileRestUntil <= world.GameHours);
+        Assert.True(system.ClaimParty(new PartyClaim("twr.reprisal", PartyKind.Hostile, "Me", 100)));
+    }
+
+    [Fact]
+    public void An_offer_never_confirmed_lapses_after_one_assessment_without_a_rest()
+    {
+        var (world, system, _) = Offered();
+
+        world.GameHours += new RivalryOptions().AssessEveryHours + 0.5;
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+
+        Assert.Empty(system.Parties);
+        Assert.True(system.HostileRestUntil <= world.GameHours);
+    }
+
+    [Fact]
+    public void An_offer_confirmed_by_proposing_again_holds_its_claim_hours_and_its_end_starts_the_rest()
+    {
+        var (world, system, bounty) = Offered();
+        Assert.True(system.Propose(bounty));
+
+        world.GameHours += bounty.ClaimHours - 1;
+        world.Commands.Enqueue(new AssessNowCommand { Tick = world.Tick });
+        world.RunTicks(2);
+        Assert.Equal("twr.bounty", Assert.Single(system.Parties).Source);
+
+        Assert.True(system.ReleaseParty("twr.bounty", "Me"));
+        world.RunTicks(1);
+        Assert.Equal(world.GameHours + 12, system.HostileRestUntil, 0.01);
+    }
+
+    [Fact]
+    public void An_offer_stays_unconfirmed_across_a_save()
+    {
+        var (_, system, _) = Offered();
+
+        var (world2, system2) = MakeSending(_ => { });
+        system2.Read(Saved(system));
+        world2.RunTicks(1);
+        Assert.Equal(1, system2.PartiesOut(PartyKind.Hostile));
+
+        Assert.True(system2.ReleaseParty("twr.bounty", "Me"));
+        world2.RunTicks(1);
+        Assert.True(system2.HostileRestUntil <= world2.GameHours);
+    }
+
     [Theory]
     [InlineData(6, 18, 0f, 6)]
     [InlineData(6, 18, 0.999f, 18)]
