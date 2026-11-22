@@ -1,7 +1,7 @@
 # Rivalry Core (framework mod)
 
-**Status: proposed, mod version 0.6.6, code-mod API 2. Needs Meitou 0.22.0 or 0.22.1** (`gameVersion` `>=0.22.0 <0.22.2`, "Building"); Meitou
-0.21 and earlier refuse it (0.6.0 named no game version). A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
+**Status: proposed, mod version 0.6.7, code-mod API 3. Needs Meitou 0.22.2 or later** (`gameVersion` `>=0.22.2`, "Building"); Meitou
+0.22.1 and earlier refuse it (0.6.4 to 0.6.6 run on 0.22.0 and 0.22.1; 0.6.0 named no game version). A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
 inspect the player's setup and act on it: hunt a character, raid a weak rich town, reinforce a town that is losing a fight. Not rival-only: the
 same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
 target kinds, behaviours, rules and directors (see "Extension API"; how-to: [depending on Rivalry Core](depending-on-rivalry-core.md)). Needs the engine hooks of [modding](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding.md) "World hooks".
@@ -92,10 +92,12 @@ has passed or the platoon is gone. **Unknown**: everything in play (see "Evidenc
 
 ### Driving a squad
 
-`SquadDriver`, for a behaviour that walks its squad itself instead of giving it a package: `Hold` (`PopulationSystem.HoldPlatoon` and
-`CharacterCold.Engaged` on each member, optionally the Sneak order), `Keep` (holds again; a hold is not saved, so driven runs call it every
-step), `GiveBack`, `Able` (members that can act), `FirstLiving`, `WalkTo` (true within 20; a walk under way is left alone unless `redirect`
-and its goal is more than `RedirectSlack` (10) from the new point, since each new walk asks for a fresh path) and `RollSkills`:
+`SquadDriver`, for a behaviour that walks its squad itself instead of giving it a package: `Hold` (`PopulationSystem.HoldPlatoon`, which
+since Meitou 0.22.2 holds the platoon off screen only, optionally the Sneak order; giving it back restores the members' move speed), `Keep`
+(holds again; a hold is not saved, so driven runs call it every step), `GiveBack`, `Able` (members that can act), `FirstLiving`, `WalkTo`
+(a move order, `World.GiveOrder` with `MoveCusOrdered`, which keeps the AI off the member while it runs, at run or walk speed; true within 20;
+a move under way is left alone unless `redirect` and its goal is more than `RedirectSlack` (10) from the new point, since each new move asks
+for a fresh path) and `RollSkills`:
 a number argument named `<skill>Min` (and `<skill>Max`), the skill a `StatsEnumerated` name in any case (`stealthMin`, `martialArtsMax`),
 gives every member that skill uniformly in the range when the squad loads. A run that ends, or whose squad unloads, gives the platoon back.
 
@@ -426,9 +428,9 @@ a visit are the game's own, read in FCS.
 
 ## Building
 
-Built against the released game players run: the `engine` submodule is pinned to Meitou's release tag (`v0.22.1`), and
-`Directory.Build.rsp` stamps the engine assemblies as `0.22.0.0`, the oldest release the mod supports (`gameVersion` `>=0.22.0 <0.22.2`
-in `meitou.json`). Without the stamp the submodule builds them as `1.0.0.0`; .NET never binds a reference to an older assembly, so the
+Built against the released game players run: the `engine` submodule is pinned to Meitou's release tag (`v0.22.2`; until that
+release exists, the nightly tag `v0.22.2-nightly.20261122.2`), and `Directory.Build.rsp` stamps the engine assemblies as `0.22.2.0`, the
+oldest release the mod supports (`gameVersion` `>=0.22.2` in `meitou.json`). Without the stamp the submodule builds them as `1.0.0.0`; .NET never binds a reference to an older assembly, so the
 released game refuses the mod ("entry type ... is not in its assemblies"). The mod's own assembly keeps its manifest version
 (`Directory.Build.props`). A newer game release that changes an engine call the mod makes needs a new pin, stamp and range together.
 

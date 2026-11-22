@@ -61,7 +61,7 @@ against one engine:
 Import `deps/RivalryCore/engine/Directory.Build.props` from your own `Directory.Build.props`, so your mod builds with the engine's settings.
 
 Stamp the engine as the oldest game release your mod supports, or the released game refuses your DLL (the submodule builds the engine as
-`1.0.0.0`, and .NET never binds to an older assembly): a `Directory.Build.rsp` in your repo's root holding `-p:AssemblyVersion=0.22.0.0`,
+`1.0.0.0`, and .NET never binds to an older assembly): a `Directory.Build.rsp` in your repo's root holding `-p:AssemblyVersion=0.22.2.0`,
 and the same range in your `gameVersion`. Copy Rivalry Core's `Directory.Build.props` lines if your own assembly should keep its manifest
 version.
 
@@ -124,7 +124,8 @@ compiler never ties to Rivalry Core.
   party caps; 0.6.1 adds the rest between hunts (`HostileRestUntil`); 0.6.2 who goes next (`Propose`, `Rule.Grudge`, `Assessment.Propose`);
   0.6.4 builds against Meitou 0.22 and needs it (`gameVersion` `>=0.22.0 <0.22.2`); 0.6.5 renames `MaxHuntsPerAssessment` to
   `GrudgeCandidatesPerAssessment` (the old name still works, marked obsolete); 0.6.6 offers a winning candidate its claim for one assessment,
-  confirmed by the next `Propose` (an offer that ends unconfirmed starts no rest).
+  confirmed by the next `Propose` (an offer that ends unconfirmed starts no rest); 0.6.7 ports to Meitou 0.22.2 and needs it
+  (`gameVersion` `>=0.22.2`, code-mod API 3): move your own floor, stamp and `apiVersion` with it.
 - Rivalry Core must sit above your mod in `data/mods.cfg`; the launcher and loader say "move X above it" otherwise.
 
 ## 3. Two ways players get it
