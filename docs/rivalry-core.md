@@ -1,6 +1,7 @@
 # Rivalry Core (framework mod)
 
-**Status: proposed, mod version 0.6.5, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
+**Status: proposed, mod version 0.6.5, code-mod API 2. Needs Meitou 0.22.0 or 0.22.1** (`gameVersion` `>=0.22.0 <0.22.2`, "Building"); Meitou
+0.21 and earlier refuse it (0.6.0 named no game version). A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
 inspect the player's setup and act on it: hunt a character, raid a weak rich town, reinforce a town that is losing a fight. Not rival-only: the
 same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
 target kinds, behaviours, rules and directors (see "Extension API"; how-to: [depending on Rivalry Core](depending-on-rivalry-core.md)). Needs the engine hooks of [modding](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding.md) "World hooks".
@@ -208,8 +209,9 @@ the setting "Friendly parties at once" (`FriendlyPartiesAtOnce`, 1 to 10, defaul
   held start logs `held: resting after the last hostile party until <hour> h`; `IRivalryState.HostileRestUntil` gives the hour.
 - Debug rows (`fire rule`, `visit town`) skip the caps and the rest.
 - A mod running a party itself (not as a Rivalry behaviour) counts it with `IRivalryState.ClaimParty(new PartyClaim(source, kind, key, hours,
-  faction))`: true when it holds, false when the cap is full (send nothing; ask again later). Renew with the same source and key while the
-  party is out; release with `ReleaseParty(source, key)`; an unrenewed claim lapses after `hours`, so a removed mod frees its slot.
+  faction))`: true when it holds, false when the cap is full or (hostile) the rest runs (send nothing; ask again later). Renew with the
+  same source and key while the party is out (a renewal always holds); release with `ReleaseParty(source, key)`; an unrenewed claim lapses
+  after `hours`, so a removed mod frees its slot. A hostile claim that ends starts the rest.
 - `IRivalryState.Parties` (a copy), `PartiesOut(kind)` and `PartyCap(kind)` show what is out. `Custom` and `Direct` decisions are not counted:
   send parties through a behaviour, a hunt or raid decision, or a claim.
 
