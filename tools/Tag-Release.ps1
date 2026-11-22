@@ -1,9 +1,10 @@
 <#
 .SYNOPSIS
-    Tags the release branch head as <slug>-v<version>, which runs release.yml and publishes the mod zip.
+    Manual fallback: tags the release branch head as <slug>-v<version>, which runs release.yml and publishes the mod zip.
 
 .DESCRIPTION
-    Run only when the repo owner asks for a release, after the beta -> main -> release promotion PRs are merged.
+    Normally not needed: a push to release tags and publishes by itself (release.yml). Use this only when that run failed
+    before creating the tag, and only when the repo owner asks.
     Reads the slug and mod folder from .github/workflows/release.yml and the version from that folder's meitou.json on
     the remote release branch, refuses a tag that already exists, prints the git commands, then runs them.
 
