@@ -28,7 +28,7 @@ Don't push to `beta` or `main` directly, rewrite their history, or merge another
 - Register it: a row in the README table, a folder in `RivalryCore.slnx`, a slug line in `.github/workflows/release.yml`, and an owner line
   in `.github/CODEOWNERS`.
 - Depend on another mod only through its public API and a `dependencies` range in `meitou.json` (e.g. Rivalry Core's `IRivalryApi`, see
-  [docs/depending-on-rivalry-core.md](docs/depending-on-rivalry-core.md)), never its internals. A breaking API change bumps that mod's minor version (major after 1.0) and updates its dependents in the same PR.
+  [docs/depending-on-rivalry-core.md](docs/depending-on-rivalry-core.md)), never its internals. Only a change to the contract dependents call bumps that mod's minor version (major after 1.0), with its dependents updated in the same PR; everything else is a patch ([.github/RELEASING.md](.github/RELEASING.md)).
 
 ## Rules
 

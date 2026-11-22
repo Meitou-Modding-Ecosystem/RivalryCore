@@ -54,6 +54,8 @@ copies or replaces it. Read `docs/depending-on-rivalry-core.md` first, and `docs
    `ClaimParty` within `hours` while out, `ReleaseParty` when done, or at once if it won but you won't send it (a win is an offer for one
    assessment until that `true`; an unconfirmed one starts no rest). Key: stable across loads (a character's name, `town{n}`).
 9. **Docs**: describe the mod's rules, args and settings in `docs/<mod>.md`; a change to Rivalry Core's API updates `docs/rivalry-core.md`
-   and `docs/depending-on-rivalry-core.md`, bumps its minor version and its dependents' ranges in the same PR.
+   and `docs/depending-on-rivalry-core.md`. Only a contract change (a member in `RivalryCore.Tests/DependentContract.txt` removed or
+   reshaped, a new member dependents must implement, or a documented behaviour their correct code relies on) bumps the minor, with every
+   dependent's range in the same PR; anything else is a patch ([RELEASING.md](../../../.github/RELEASING.md)).
 10. **Check**: `dotnet build` (warnings are errors), `dotnet test`; in game, F10 `Rivalry: runs and rules`, `Rivalry: parties`,
     `Rivalry: fire rule (your rule, target)` (skips the cap), `Rivalry: log` for `held: ...` lines.
