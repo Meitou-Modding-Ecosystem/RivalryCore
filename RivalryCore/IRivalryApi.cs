@@ -78,8 +78,9 @@ public interface IRivalryState
     double HostileRestUntil { get; }
 
     /// <summary>
-    /// Counts a party the calling mod runs itself under the caps, or renews its claim of the same source and key: true when it holds. False:
-    /// the cap is full (send nothing now and ask again later). The claim lapses <see cref="PartyClaim.Hours"/> after it was made or renewed, so
+    /// Counts a party the calling mod runs itself under the caps, or renews its claim of the same source and key: true when it holds (a renewal
+    /// always holds). False: the cap is full or, for a hostile party, the rest between hunts runs (send nothing now and ask again later); it
+    /// skips the queue (<see cref="Propose"/>) but not the rest, and a hostile claim that ends starts one. The claim lapses <see cref="PartyClaim.Hours"/> after it was made or renewed, so
     /// renew it while the party is out and release it when it ends.
     /// </summary>
     bool ClaimParty(PartyClaim claim);
@@ -93,6 +94,7 @@ public interface IRivalryState
     /// Puts a hostile party the calling mod would send now in the queue of who goes next (docs/rivalry-core.md "Who goes next"): true when it
     /// won and holds a claim of <see cref="HostileCandidate.ClaimHours"/> (send it now, renew with <see cref="ClaimParty"/> while it is out,
     /// release it when it ends). False: it waits; propose it again at least every assessment while it still wants to go, or it is dropped.
+    /// A win is offered for one assessment and confirmed by this call returning true; an offer released or lapsed unconfirmed starts no rest.
     /// </summary>
     bool Propose(HostileCandidate candidate);
 

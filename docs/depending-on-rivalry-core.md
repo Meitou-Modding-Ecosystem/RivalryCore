@@ -119,10 +119,12 @@ compiler never ties to Rivalry Core.
 "dependencies": [{ "id": "rivalry.core", "version": ">=0.6.0 <0.7.0" }]
 ```
 
-- Before 1.0 a minor version may break the API, so cap the range at the next minor. 0.6.0 is the first version with party caps; 0.6.1 adds
-  the rest between hunts (`HostileRestUntil`); 0.6.2 who goes next (`Propose`, `Rule.Grudge`, `Assessment.Propose`); 0.6.4 builds against
-  Meitou 0.22 and needs it (`gameVersion` `>=0.22.0 <0.22.2`); 0.6.5 renames `MaxHuntsPerAssessment` to
-  `GrudgeCandidatesPerAssessment` (the old name still works, marked obsolete).
+- Before 1.0 only a minor version changes the contract you call ([RELEASING.md](../.github/RELEASING.md)); fixes, additions and ports to a new
+  Meitou are patches, so cap the range at the next minor and your release keeps loading with every 0.6.x. 0.6.0 is the first version with
+  party caps; 0.6.1 adds the rest between hunts (`HostileRestUntil`); 0.6.2 who goes next (`Propose`, `Rule.Grudge`, `Assessment.Propose`);
+  0.6.4 builds against Meitou 0.22 and needs it (`gameVersion` `>=0.22.0 <0.22.2`); 0.6.5 renames `MaxHuntsPerAssessment` to
+  `GrudgeCandidatesPerAssessment` (the old name still works, marked obsolete); 0.6.6 offers a winning candidate its claim for one assessment,
+  confirmed by the next `Propose` (an offer that ends unconfirmed starts no rest).
 - Rivalry Core must sit above your mod in `data/mods.cfg`; the launcher and loader say "move X above it" otherwise.
 
 ## 3. Two ways players get it
@@ -187,7 +189,8 @@ a.Propose(candidate, () => { if (d.TryClaim(key, 48)) d.Start(BuiltIn.Pursue, ta
 ```
 
 - **A party your mod runs itself** (its own pursuit code, not a Rivalry behaviour): propose it, send it once it holds the slot, renew the
-  claim while out, release it after.
+  claim while out, release it after. A win is an offer that lasts one assessment: propose again soon (the `true` confirms it), and release
+  it if you won't send the party after all (it then starts no rest).
 
 ```csharp
 var state = rivalry.In(world);                        // in your system's serial step
@@ -200,7 +203,9 @@ state.ReleaseParty(candidate.Source, key);            // when it ends
 ```
 
 - `ClaimParty` alone still works (it takes a free slot at once, skipping the queue); use it only for a party that cannot wait, such as one
-  already under way when your mod loads.
+  already under way when your mod loads. It skips the queue but not the rest between hunts: a new claim is refused while the rest runs
+  (`HostileRestUntil`), a renewal of a claim already held always holds, and a claim that ends (released or lapsed) starts a rest like any
+  hostile party.
 
 - **Going over the cap**: only on purpose, in `Initialize`: `mine.ExceedHostileCap($"{c.Id}.siege", 1, "the siege brings its own scouts")`.
   The source may send one more than the cap; its parties still count for everyone else. `Rivalry: parties` (F10) lists every override.

@@ -6,7 +6,7 @@ namespace Rivalry;
 public sealed partial class RivalrySystem
 {
     /// <summary>The sidecar layout's version (docs/rivalry-core.md "Save data").</summary>
-    public const int SaveVersion = 6;
+    public const int SaveVersion = 7;
 
     /// <summary>A saved grudge waiting for its character: faction by string id, character by name and record (slots differ after a load).</summary>
     readonly record struct SavedGrudge(string Faction, string Name, string Record, float Value, float HeldFloor = 0);
@@ -41,10 +41,17 @@ public sealed partial class RivalrySystem
         _parties.Write(w, _data);
         _parties.WriteRest(w);
         _queue.Write(w);
+        _parties.WriteOffers(w);
     }
 
+    /// <summary>
+    /// Writes every grudge whose character is named; one started since the last serial step is named first, so a save made right after a hit
+    /// keeps it.
+    /// </summary>
     void WriteGrudges(BinaryWriter w)
     {
+        if (_world is { } world) NameSubjects(world);
+
         var saved = Notoriety.Entries
             .Where(g => g.Key.Faction < _data.Factions.Count && _subjects.ContainsKey(g.Key.Who))
             .Select(g => Saved(g.Key, g.Value))
@@ -99,6 +106,9 @@ public sealed partial class RivalrySystem
         // Version 6 adds, last, the hours the hostile candidates have waited.
         if (version >= 6) _queue.Read(r);
         else _queue.Clear();
+
+        // Version 7 adds, last, which ledger claims are offers not yet confirmed.
+        if (version >= 7) _parties.ReadOffers(r);
     }
 
     static List<SavedGrudge> ReadGrudges(BinaryReader r, bool withFloors)

@@ -7,6 +7,10 @@ Mods that lived here now have their own repos: [AshenHand](https://github.com/Me
 [Husbandry](https://github.com/Meitou-Modding-Ecosystem/Husbandry), [SquadArena](https://github.com/Meitou-Modding-Ecosystem/SquadArena)
 (squad rating in Dust-bandit equivalents) and [LogisticsCore](https://github.com/Meitou-Modding-Ecosystem/LogisticsCore) (vanilla node seeding). New mods start from [MeitouModTemplate](https://github.com/Meitou-Modding-Ecosystem/MeitouModTemplate).
 
+Agent rules for the engine pin, versions, CI and releases: [CLAUDE.md](CLAUDE.md) (same as `AGENTS.md`); procedures: skill
+`.claude/skills/meitou-engine-release`; working across repos: [docs/agents-across-repos.md](docs/agents-across-repos.md); local setup:
+[docs/local-development.md](docs/local-development.md).
+
 Building a mod on Rivalry Core: [docs/depending-on-rivalry-core.md](docs/depending-on-rivalry-core.md) (agent skill:
 `.claude/skills/rivalry-core-dependent`). Planned work: [docs/roadmap.md](docs/roadmap.md). Factions and where their squads come from: [docs/factions.md](docs/factions.md).
 
@@ -15,8 +19,7 @@ outlaws and town talk, with a public API: [docs/wasteland-remembers-api.md](docs
 
 ## Layout
 
-- `engine/`: MeitouClient as a git submodule, pinned to the commit the mods build against: the head of the fork's `fork` branch (upstream
-  plus fork-only CI and mod API).
+- `engine/`: MeitouClient as a git submodule, pinned to the upstream Meitou release tag the mods build against (`CLAUDE.md`, Engine).
 - `<Mod>/`: the mod's project and `meitou.json`. `<Mod>.Tests/`: its tests (synthetic worlds, no game install needed).
 - `Directory.Build.props` imports the engine's, so mods build with the game's settings (warnings are errors).
 
@@ -28,19 +31,22 @@ dotnet build
 dotnet test
 ```
 
-After a pull that moves the engine pin: `git submodule update --init`.
-
 One click from Visual Studio: open `RivalryCore.slnx` and press F5 on the `Play` project; it builds the engine and mods, copies the mods
 into the game and runs it ([docs/play.md](docs/play.md)).
 
-A clone that won't build (empty `engine/`, wrong branch):
+After every pull, and whenever a build fails with engine types missing (e.g. `The type or namespace name 'RelationCause' could not be
+found`), close Visual Studio and run:
 
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\Update-Local.ps1 -Clean -Build
 ```
-git fetch origin
-git checkout beta
-git pull
-git submodule update --init --recursive
-```
+
+- It switches to `beta` and pulls it, then moves `engine/` to the commit `beta` pins (`git pull` alone leaves it on the old one).
+  `-Branch <name>` pulls another branch.
+- It checks the submodule against its pin, prints the engine version, flags a `MeitouEngineDir` override (user props or environment) and
+  lists folders this branch no longer has (e.g. mods moved to their own repos).
+- `-Clean` deletes the git-ignored `bin` and `obj` folders, so no build of the old engine is reused. `-Build` runs `dotnet build`.
+- It ends with `Up to date` or a list of lines marked `FIX`.
 
 Pulling upstream MeitouClient in: `pwsh tools/Sync-Upstream.ps1` (upstream -> engine `master` -> `fork` -> `beta` -> `main`, one PR per step;
 run it again after each merge, `-Abort` drops an unfinished merge; details at the top of the script).
