@@ -200,7 +200,9 @@ state.ReleaseParty(candidate.Source, key);            // when it ends
 ```
 
 - `ClaimParty` alone still works (it takes a free slot at once, skipping the queue); use it only for a party that cannot wait, such as one
-  already under way when your mod loads.
+  already under way when your mod loads. It skips the queue but not the rest between hunts: a new claim is refused while the rest runs
+  (`HostileRestUntil`), a renewal of a claim already held always holds, and a claim that ends (released or lapsed) starts a rest like any
+  hostile party.
 
 - **Going over the cap**: only on purpose, in `Initialize`: `mine.ExceedHostileCap($"{c.Id}.siege", 1, "the siege brings its own scouts")`.
   The source may send one more than the cap; its parties still count for everyone else. `Rivalry: parties` (F10) lists every override.
