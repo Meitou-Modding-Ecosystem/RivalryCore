@@ -59,8 +59,9 @@ public static class SquadDriver
     }
 
     /// <summary>
-    /// Takes the platoon's movement from the population and the members from the AI (<paramref name="held"/>), or gives both back. Sneaking is
-    /// set or cleared with it when <paramref name="sneak"/> says so.
+    /// Takes the platoon's off-screen movement from the population (<paramref name="held"/>), or gives it back. Meitou 0.22.2 holds a platoon off
+    /// screen only: loaded members keep their minds, and <see cref="WalkTo"/> moves them with orders, which hold a character while they run.
+    /// Sneaking is set or cleared with it when <paramref name="sneak"/> says so; giving the platoon back restores the members' move speed.
     /// </summary>
     public static void Hold(World world, int platoon, Squad squad, bool held, bool? sneak = null)
     {
@@ -70,7 +71,7 @@ public static class SquadDriver
         {
             if (!table.TryResolveNext(id, out int slot) || table.Cold(slot) is not { } c) continue;
 
-            c.Engaged = held;
+            if (!held) c.RunSpeed = SpeedMode.Free;
             if (sneak == true) c.Orders |= CharacterOrders.Sneak;
             else if (sneak == false) c.Orders &= ~CharacterOrders.Sneak;
         }
@@ -136,18 +137,22 @@ public static class SquadDriver
     }
 
     /// <summary>
-    /// Walks the character to a point: true when it is there. A walk under way is left alone unless <paramref name="redirect"/> and its goal is
-    /// more than <see cref="RedirectSlack"/> from the point (the goal moved).
+    /// Walks the character to a point with a move order (<see cref="World.GiveOrder"/>, the player's move command; it holds the character from
+    /// the AI while it runs): true when it is there. A move order under way is left alone unless <paramref name="redirect"/> and its goal is more
+    /// than <see cref="RedirectSlack"/> from the point (the goal moved). <paramref name="run"/> sets the speed the character's move orders use.
     /// </summary>
     public static bool WalkTo(World world, int slot, Vector3 to, bool run = false, bool redirect = false)
     {
         if (Distance(world, slot, to) <= Reach) return true;
 
-        ref readonly var hot = ref world.Characters.Next[slot];
-        bool walking = hot.Task == (byte)CharacterTask.GoTo;
+        var table = world.Characters;
+        ref readonly var hot = ref table.Next[slot];
+        var cold = table.Cold(slot)!;
+        bool walking = hot.Task == (byte)CharacterTask.GoTo && cold.Running is { Source: TaskSource.Order, Row: TaskType.MoveCusOrdered };
         if (walking && (!redirect || Vector2.Distance(hot.Goal, to.Flat()) <= RedirectSlack)) return false;
 
-        TaskStart.Walk(world, slot, to, run ? SpeedMode.Run : SpeedMode.Walk, TaskType.MoveOnFreeWill, TaskSource.Npc);
+        cold.RunSpeed = run ? SpeedMode.Run : SpeedMode.Walk;
+        world.GiveOrder(table.IdOf(slot), TaskType.MoveCusOrdered, point: to);
         return false;
     }
 }
