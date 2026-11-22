@@ -1,4 +1,4 @@
-<Project>
+<Project TreatAsLocalProperty="AssemblyVersion">
 
   <!-- The engine's build settings (target framework, warnings as errors, code style), so a mod builds exactly as the game does. -->
   <Import Project="engine/Directory.Build.props" />
@@ -11,6 +11,7 @@
   <PropertyGroup Condition="Exists('$(MSBuildProjectDirectory)/meitou.json')">
     <ModManifestText>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/meitou.json'))</ModManifestText>
     <Version>$([System.Text.RegularExpressions.Regex]::Match($(ModManifestText), '"version"\s*:\s*"([^"]+)"').Groups[1].Value)</Version>
+    <AssemblyVersion>$([System.Text.RegularExpressions.Regex]::Match($(Version), '^\d+\.\d+\.\d+').Value).0</AssemblyVersion>
   </PropertyGroup>
 
 </Project>

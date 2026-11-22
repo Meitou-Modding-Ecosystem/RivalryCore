@@ -60,6 +60,11 @@ against one engine:
 
 Import `deps/RivalryCore/engine/Directory.Build.props` from your own `Directory.Build.props`, so your mod builds with the engine's settings.
 
+Stamp the engine as the oldest game release your mod supports, or the released game refuses your DLL (the submodule builds the engine as
+`1.0.0.0`, and .NET never binds to an older assembly): a `Directory.Build.rsp` in your repo's root holding `-p:AssemblyVersion=0.22.0.0`,
+and the same range in your `gameVersion`. Copy Rivalry Core's `Directory.Build.props` lines if your own assembly should keep its manifest
+version.
+
 To install the pinned Rivalry Core for play, download the beta zip of that commit if it has one; otherwise, **in your mod repo's root**:
 
 ```sh
@@ -115,7 +120,8 @@ compiler never ties to Rivalry Core.
 ```
 
 - Before 1.0 a minor version may break the API, so cap the range at the next minor. 0.6.0 is the first version with party caps; 0.6.1 adds
-  the rest between hunts (`HostileRestUntil`); 0.6.2 who goes next (`Propose`, `Rule.Grudge`, `Assessment.Propose`).
+  the rest between hunts (`HostileRestUntil`); 0.6.2 who goes next (`Propose`, `Rule.Grudge`, `Assessment.Propose`); 0.6.4 builds against
+  Meitou 0.22 and needs it (`gameVersion` `>=0.22.0 <0.22.2`).
 - Rivalry Core must sit above your mod in `data/mods.cfg`; the launcher and loader say "move X above it" otherwise.
 
 ## 3. Two ways players get it
