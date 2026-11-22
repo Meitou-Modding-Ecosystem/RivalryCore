@@ -142,7 +142,22 @@ public sealed class RivalryOptions
     public float HuntRadius { get; set; } = 20000;
     public float HuntHours { get; set; } = 24;
     public double HuntCooldownHours { get; set; } = 48;
-    public int MaxHuntsPerAssessment { get; set; } = 2;
+
+    /// <summary>
+    /// How many of the largest grudges the grudge director (<see cref="GrudgeDirector"/>) proposes as hostile candidates at each assessment.
+    /// It does not decide how many go: the hostile party cap and who goes next do (docs/rivalry-core.md "Who goes next").
+    /// </summary>
+    public int GrudgeCandidatesPerAssessment { get; set; } = 8;
+
+    /// <summary>
+    /// The old name of <see cref="GrudgeCandidatesPerAssessment"/>, as a quarter of it (it used to cap the hunts sent per assessment).
+    /// </summary>
+    [Obsolete("Use GrudgeCandidatesPerAssessment: this no longer limits the hunts sent, only the grudges proposed (4 per unit).")]
+    public int MaxHuntsPerAssessment
+    {
+        get => GrudgeCandidatesPerAssessment / 4;
+        set => GrudgeCandidatesPerAssessment = value * 4;
+    }
 
     /// <summary>
     /// What a hunter says when it starts a fight with anyone but its quarry; <c>{target}</c> is the quarry's name.
