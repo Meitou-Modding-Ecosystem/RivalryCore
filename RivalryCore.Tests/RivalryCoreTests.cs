@@ -8,6 +8,7 @@ using Meitou.Modding;
 using Meitou.Simulation;
 using Meitou.Simulation.Factions;
 using Meitou.Simulation.Movement;
+using Meitou.Simulation.Player;
 using Meitou.Simulation.Population;
 using SimWorld = Meitou.Simulation.World;
 
@@ -727,15 +728,17 @@ public class RivalryCoreTests
         Assert.Equal(TaskType.MoveCusOrdered, world.Characters.Cold(slot)!.Running?.Row);   // a move order: the AI leaves the hunter to it
         Assert.Equal(SpeedMode.Run, world.Characters.Cold(slot)!.RunSpeed);
 
-        // Pin the walk's goal to the point and mark the walk, to see whether a new one starts.
+        // Pin the walk's goal to the point; each new move order replaces the queue's front with a new entry.
         world.Characters.Next[slot].Goal = new Vector2(goal.X, goal.Z);
-        world.Characters.Next[slot].TaskTime = 99;
+        var queue = world.Characters.Cold(slot)!.OrderQueue;
+        var first = Assert.IsType<OrderEntry>(queue.Front);
 
         SquadDriver.WalkTo(world, slot, goal + new Vector3(SquadDriver.RedirectSlack / 2, 0, 0), run: true, redirect: true);
-        Assert.Equal(99, world.Characters.Next[slot].TaskTime);   // moved within the slack: the same walk
+        Assert.Same(first, queue.Front);      // moved within the slack: the same move
 
         SquadDriver.WalkTo(world, slot, goal + new Vector3(SquadDriver.RedirectSlack * 3, 0, 0), run: true, redirect: true);
-        Assert.Equal(0, world.Characters.Next[slot].TaskTime);    // moved past it: a new walk
+        Assert.NotSame(first, queue.Front);   // moved past it: a new move
+        Assert.Equal(TaskType.MoveCusOrdered, queue.Front?.Row);
     }
 
     #endregion
