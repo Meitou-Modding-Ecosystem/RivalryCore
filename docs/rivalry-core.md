@@ -1,6 +1,6 @@
 # Rivalry Core (framework mod)
 
-**Status: proposed, mod version 0.6.3, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
+**Status: proposed, mod version 0.6.4, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
 inspect the player's setup and act on it: hunt a character, raid a weak rich town, reinforce a town that is losing a fight. Not rival-only: the
 same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
 target kinds, behaviours, rules and directors (see "Extension API"; how-to: [depending on Rivalry Core](depending-on-rivalry-core.md)). Needs the engine hooks of [modding](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding.md) "World hooks".
@@ -420,6 +420,12 @@ Hand its `AshenHand.mod`); `rule X threw: ...`. A rule fired this way does not s
 a visit are the game's own, read in FCS.
 
 ## Building
+
+Built against the released game players run: the `engine` submodule is pinned to Meitou's release tag (`v0.22.1`), and
+`Directory.Build.rsp` stamps the engine assemblies as `0.22.0.0`, the oldest release the mod supports (`gameVersion` `>=0.22.0 <0.22.2`
+in `meitou.json`). Without the stamp the submodule builds them as `1.0.0.0`; .NET never binds a reference to an older assembly, so the
+released game refuses the mod ("entry type ... is not in its assemblies"). The mod's own assembly keeps its manifest version
+(`Directory.Build.props`). A newer game release that changes an engine call the mod makes needs a new pin, stamp and range together.
 
 `dotnet build RivalryCore` writes `RivalryCore.dll` and `meitou.json`; the game assemblies are referenced with `Private="false"`. Copy both
 into `Kenshi/mods/RivalryCore/` beside an empty `RivalryCore.mod` made in FCS and enable it in `mods.cfg` above its dependents.
