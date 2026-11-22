@@ -43,8 +43,14 @@ public sealed partial class RivalrySystem
         _queue.Write(w);
     }
 
+    /// <summary>
+    /// Writes every grudge whose character is named; one started since the last serial step is named first, so a save made right after a hit
+    /// keeps it.
+    /// </summary>
     void WriteGrudges(BinaryWriter w)
     {
+        if (_world is { } world) NameSubjects(world);
+
         var saved = Notoriety.Entries
             .Where(g => g.Key.Faction < _data.Factions.Count && _subjects.ContainsKey(g.Key.Who))
             .Select(g => Saved(g.Key, g.Value))
