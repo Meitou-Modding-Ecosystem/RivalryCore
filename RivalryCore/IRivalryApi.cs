@@ -94,6 +94,7 @@ public interface IRivalryState
     /// Puts a hostile party the calling mod would send now in the queue of who goes next (docs/rivalry-core.md "Who goes next"): true when it
     /// won and holds a claim of <see cref="HostileCandidate.ClaimHours"/> (send it now, renew with <see cref="ClaimParty"/> while it is out,
     /// release it when it ends). False: it waits; propose it again at least every assessment while it still wants to go, or it is dropped.
+    /// A win is offered for one assessment and confirmed by this call returning true; an offer released or lapsed unconfirmed starts no rest.
     /// </summary>
     bool Propose(HostileCandidate candidate);
 

@@ -122,7 +122,8 @@ compiler never ties to Rivalry Core.
 - Before 1.0 a minor version may break the API, so cap the range at the next minor. 0.6.0 is the first version with party caps; 0.6.1 adds
   the rest between hunts (`HostileRestUntil`); 0.6.2 who goes next (`Propose`, `Rule.Grudge`, `Assessment.Propose`); 0.6.4 builds against
   Meitou 0.22 and needs it (`gameVersion` `>=0.22.0 <0.22.2`); 0.6.5 renames `MaxHuntsPerAssessment` to
-  `GrudgeCandidatesPerAssessment` (the old name still works, marked obsolete).
+  `GrudgeCandidatesPerAssessment` (the old name still works, marked obsolete); 0.6.6 offers a winning candidate its claim for one
+  assessment, confirmed by the next `Propose` (an offer that ends unconfirmed starts no rest).
 - Rivalry Core must sit above your mod in `data/mods.cfg`; the launcher and loader say "move X above it" otherwise.
 
 ## 3. Two ways players get it
@@ -187,7 +188,8 @@ a.Propose(candidate, () => { if (d.TryClaim(key, 48)) d.Start(BuiltIn.Pursue, ta
 ```
 
 - **A party your mod runs itself** (its own pursuit code, not a Rivalry behaviour): propose it, send it once it holds the slot, renew the
-  claim while out, release it after.
+  claim while out, release it after. A win is an offer that lasts one assessment: propose again soon (the `true` confirms it), and release
+  it if you won't send the party after all (it then starts no rest).
 
 ```csharp
 var state = rivalry.In(world);                        // in your system's serial step

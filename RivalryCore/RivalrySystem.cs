@@ -220,8 +220,10 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
         if (_runs.All.Count > 0) _runs.Step(Context(world));
         Rivals.Idle(_runs.All.Where(r => r.Args.Text("leaderName") is not null).Select(LeaderOf));
 
+        // an offer not yet confirmed fills the cap but does not count for the rest: one that ends unconfirmed sent nothing
         var parties = PartiesNow(world);
-        LookForRest(world, parties.Count(p => p.Kind == PartyKind.Hostile));
+        int hostile = parties.Count(p => p.Kind == PartyKind.Hostile) - _parties.HostileOffers(Report, world.GameHours);
+        LookForRest(world, hostile);
         PublishRuns(parties);
     }
 
@@ -436,14 +438,20 @@ public sealed partial class RivalrySystem : ICombatHitObserver, IStateHashed, IM
     }
 
     /// <summary>
-    /// Gives another mod's winning candidate its claim.
+    /// Offers another mod's winning candidate its claim for one assessment; its next <see cref="Propose"/> confirms it for
+    /// <see cref="HostileCandidate.ClaimHours"/>.
     /// </summary>
     bool Grant(HostileCandidate c, double now)
     {
-        bool held = _parties.Claim(Claim(c), PartiesOut(PartyKind.Hostile), _options, now);
-        if (held) Remember($"{c.Source}: {c.Key} goes next (claim for {c.ClaimHours:0.#} h)");
+        bool held = _parties.Offer(Claim(c), PartiesOut(PartyKind.Hostile), _options, now, OfferHours);
+        if (held) Remember($"{c.Source}: {c.Key} goes next (offered for {OfferHours:0.#} h until it proposes again)");
         return held;
     }
+
+    /// <summary>
+    /// The game hours an offered claim waits for its mod to confirm it: one assessment.
+    /// </summary>
+    double OfferHours => Math.Max(1, _options.AssessEveryHours);
 
     /// <summary>
     /// The game hours another mod's candidate stays in the queue after it was last proposed.
