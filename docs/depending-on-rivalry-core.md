@@ -121,7 +121,8 @@ compiler never ties to Rivalry Core.
 
 - Before 1.0 a minor version may break the API, so cap the range at the next minor. 0.6.0 is the first version with party caps; 0.6.1 adds
   the rest between hunts (`HostileRestUntil`); 0.6.2 who goes next (`Propose`, `Rule.Grudge`, `Assessment.Propose`); 0.6.4 builds against
-  Meitou 0.22 and needs it (`gameVersion` `>=0.22.0 <0.22.2`).
+  Meitou 0.22 and needs it (`gameVersion` `>=0.22.0 <0.22.2`); 0.6.5 renames `MaxHuntsPerAssessment` to
+  `GrudgeCandidatesPerAssessment` (the old name still works, marked obsolete).
 - Rivalry Core must sit above your mod in `data/mods.cfg`; the launcher and loader say "move X above it" otherwise.
 
 ## 3. Two ways players get it

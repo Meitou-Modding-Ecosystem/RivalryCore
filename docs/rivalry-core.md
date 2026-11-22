@@ -1,6 +1,6 @@
 # Rivalry Core (framework mod)
 
-**Status: proposed, mod version 0.6.4, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
+**Status: proposed, mod version 0.6.5, code-mod API 2.** A code mod in `RivalryCore` (id `rivalry.core`) that lets the world's factions
 inspect the player's setup and act on it: hunt a character, raid a weak rich town, reinforce a town that is losing a fight. Not rival-only: the
 same pipeline sends allies to help and friendly visitors. Built on [dependencies](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding-dependencies.md); other mods add probes, conditions,
 target kinds, behaviours, rules and directors (see "Extension API"; how-to: [depending on Rivalry Core](depending-on-rivalry-core.md)). Needs the engine hooks of [modding](https://github.com/Meitou-Modding-Ecosystem/MeitouClient/blob/master/docs/modding.md) "World hooks".
@@ -63,7 +63,7 @@ director and key.
 | rule | `rivalry.reinforce` | town `rivalry.losing`: `rivalry.reinforce` by the closest ally (relation ≥ 50; allies with a DEFEND_TOWN campaign first); once per town per 12 h |
 | rule | `rivalry.opportunist` | town `rivalry.tempting`, chance `RaidChancePerDay`: `rivalry.raid` by the most hostile faction that has an assault campaign; once per town per 96 h |
 | rule | `rivalry.hit-squad` | a standing character against whom a faction's grudge is ≥ `HuntThreshold`: `rivalry.pursue` with that faction's own squad (see "Hit squads of any faction"); once per character per 48 h |
-| director | `rivalry.grudge` | a non-allied faction's grudge on a standing character ≥ `HuntThreshold` (60) and a squad of it within `HuntRadius`: `Hunt` with `HuntSquads` squads (none near: nothing, no cooldown); the largest 8 (`MaxHuntsPerAssessment` × 4) are hostile candidates with no travel (see "Who goes next"); once per faction and character name per 48 h |
+| director | `rivalry.grudge` | a non-allied faction's grudge on a standing character ≥ `HuntThreshold` (60) and a squad of it within `HuntRadius`: `Hunt` with `HuntSquads` squads (none near: nothing, no cooldown); the largest `GrudgeCandidatesPerAssessment` (8; it sets how many are proposed, not how many go) are hostile candidates with no travel (see "Who goes next"); once per faction and character name per 48 h |
 
 ## Rules
 
