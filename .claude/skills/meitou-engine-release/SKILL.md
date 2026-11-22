@@ -61,5 +61,6 @@ framework-update PR and fix the red ones there.
 1. In a PR into `beta`: bump `version` in each changed mod's `meitou.json`, and check `gameVersion` and `apiVersion` (`CLAUDE.md`,
    Versioning).
 2. Only when the owner asks: open the promotion PRs `beta` -> `main` -> `release` (each needs a super-maintainer's approval).
-3. Only when the owner asks, once `release` holds the change: push the tag `<slug>-v<version>` on the `release` head. `release.yml` builds
-   `<Mod>-<version>.zip`; the version must match `meitou.json`.
+3. Only when the owner asks, once `release` holds the change: push the tag `<slug>-v<version>` on the `release` head with
+   `powershell -ExecutionPolicy Bypass -File tools\Tag-Release.ps1` (`-DryRun` prints the git commands; `-Slug` picks one of several mods).
+   `release.yml` builds `<Mod>-<version>.zip`; the version must match `meitou.json`.
