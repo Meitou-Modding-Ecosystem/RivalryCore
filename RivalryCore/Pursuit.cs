@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using Meitou.Simulation;
 using Meitou.Simulation.Crime;
 
@@ -37,9 +38,10 @@ public sealed class PursueBehaviour : IBehaviour
     const int WatchEveryTicks = 30;
 
     /// <summary>
-    /// The quarry of each run in this world's process, by run id; after a load found again by <c>quarryName</c>.
+    /// The quarry of each run, by world and run id; after a load found again by <c>quarryName</c>. Keyed weakly by world: the behaviour outlives
+    /// the worlds it runs in, and a world left behind by a load must not be kept alive by the runs it had under way.
     /// </summary>
-    readonly Dictionary<(World, int), CharacterId> _quarry = [];
+    readonly ConditionalWeakTable<World, Dictionary<int, CharacterId>> _quarry = [];
 
     public string Name => BuiltIn.Pursue;
 
@@ -79,7 +81,7 @@ public sealed class PursueBehaviour : IBehaviour
     /// </summary>
     void Aim(BehaviourContext context, BehaviourRun run, CharacterId quarry, int slot)
     {
-        _quarry[(context.World, run.Id)] = quarry;
+        QuarriesOf(context.World)[run.Id] = quarry;
         run.Args.Set("quarryName", context.World.Characters.Cold(slot)?.Name ?? "");
         context.Notoriety.HoldFloor(run.Faction, quarry, context.Options.HuntThreshold);
 
@@ -111,7 +113,7 @@ public sealed class PursueBehaviour : IBehaviour
     /// </summary>
     void Finish(BehaviourContext context, BehaviourRun run)
     {
-        _quarry.Remove((context.World, run.Id));
+        QuarriesOf(context.World).Remove(run.Id);
         MarkEnded(context, run);
         RivalLeaders.Release(context, run);
     }
@@ -149,15 +151,21 @@ public sealed class PursueBehaviour : IBehaviour
     /// </summary>
     CharacterId Quarry(BehaviourContext context, BehaviourRun run)
     {
-        if (!_quarry.TryGetValue((context.World, run.Id), out var id))
+        var quarries = QuarriesOf(context.World);
+        if (!quarries.TryGetValue(run.Id, out var id))
         {
             id = Named(context, run.Args.Text("quarryName")) ?? MostHated(context, run.Faction);
-            _quarry[(context.World, run.Id)] = id;
+            quarries[run.Id] = id;
         }
 
         var table = context.World.Characters;
         return table.TryResolveNext(id, out int slot) && table.Cold(slot) is { Medical.Incapacitated: false } ? id : CharacterId.None;
     }
+
+    /// <summary>
+    /// The quarries of the runs in a world, by run id.
+    /// </summary>
+    Dictionary<int, CharacterId> QuarriesOf(World world) => _quarry.GetOrCreateValue(world);
 
     /// <summary>
     /// The player character with the name; null when none.

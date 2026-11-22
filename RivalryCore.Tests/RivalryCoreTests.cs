@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Text;
+using System.Text.Json;
 using Meitou.Data;
 using Meitou.Data.Fcs;
 using Meitou.Modding;
@@ -657,6 +658,27 @@ public class RivalryCoreTests
 
         SquadDriver.WalkTo(world, slot, goal + new Vector3(SquadDriver.RedirectSlack * 3, 0, 0), run: true, redirect: true);
         Assert.Equal(0, world.Characters.Next[slot].TaskTime);    // moved past it: a new walk
+    }
+
+    #endregion
+
+    #region Release build
+
+    /// <summary>
+    /// The engine assemblies Rivalry Core references are stamped as the oldest game its manifest admits (Directory.Build.rsp): a reference newer
+    /// than the released game, or the submodule's default 1.0.0.0, makes the game refuse the mod ("entry type ... is not in its assemblies", #121).
+    /// </summary>
+    [Fact]
+    public void The_engine_references_match_the_oldest_game_the_manifest_admits()
+    {
+        string manifest = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "meitou.json"));
+        string range = JsonDocument.Parse(manifest).RootElement.GetProperty("gameVersion").GetString()!;
+        var floor = Version.Parse(range.Split(' ')[0].TrimStart('>', '='));
+
+        var engine = typeof(RivalryMod).Assembly.GetReferencedAssemblies().Where(a => a.Name!.StartsWith("Meitou", StringComparison.Ordinal)).ToList();
+
+        Assert.NotEmpty(engine);
+        Assert.All(engine, a => Assert.Equal(new Version(floor.Major, floor.Minor, floor.Build, 0), a.Version));
     }
 
     #endregion
