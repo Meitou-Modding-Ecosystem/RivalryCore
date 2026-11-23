@@ -17,6 +17,19 @@ Building a mod on Rivalry Core: [docs/depending-on-rivalry-core.md](docs/dependi
 Works alongside: [The Wasteland Remembers](docs/wasteland-remembers.md) (a separate mod on the Steam Workshop; town heat, bounty hunters, rivals,
 outlaws and town talk, with a public API: [docs/wasteland-remembers-api.md](docs/wasteland-remembers-api.md)).
 
+## Numbers
+
+Task types and dialogue codes are shared by every loaded mod; Rivalry Core claims only these, inside its block
+([mod number blocks](https://github.com/TheIvoryDisaster/GutenStructure/blob/beta/docs/numbers.md)).
+
+Block 1600-1699
+
+| Number | Pool | Use |
+| --- | --- | --- |
+| 1600 | Dialogue condition | Grudge level of the speaker against the subject |
+| 1601 | Dialogue condition | Notoriety of the subject |
+| 1600 | Dialogue effect | Add to the speaker's grudge against the target |
+
 ## Layout
 
 - `engine/`: MeitouClient as a git submodule, pinned to the upstream Meitou release tag the mods build against (`CLAUDE.md`, Engine).
