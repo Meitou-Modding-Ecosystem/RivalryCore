@@ -1,9 +1,12 @@
-# Releases one mod: a tag <slug>-v<version> (rivalry-core-v0.2.0) builds that mod, checks the version against its meitou.json, and publishes
-# <Mod>-<version>.zip (with its SHA-256) holding the folder to drop into Kenshi/mods/. Packaging: GutenStructure package-meitou-mod.yml (pinned).
+# Releases one mod: every push to release reads Rivalry Core's version from its meitou.json and, unless the tag <slug>-v<version>
+# (rivalry-core-v0.2.0) exists, creates that tag at the release head and publishes <Mod>-<version>.zip (with its SHA-256) holding the folder
+# to drop into Kenshi/mods/, all in one run. A hand-pushed tag (tools/Tag-Release.ps1) releases the mod it names, as a fallback. Packaging:
+# GutenStructure package-meitou-mod.yml (pinned).
 name: Release
 
 on:
   push:
+    branches: [release]
     tags: ["*-v*"]
 
 permissions:
@@ -13,7 +16,7 @@ jobs:
   release-gate:
     permissions:
       contents: read
-    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@2136f4ee8e7c9461d635a3960d10c68d06dde893
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/release-gate.yml@29fefc59172e5427e6bbf7ef5ba1741f7fe64daa
 
   mod:
     needs: release-gate
@@ -23,14 +26,17 @@ jobs:
       folder: ${{ steps.mod.outputs.folder }}
       empty-data-mod: ${{ steps.mod.outputs.empty }}
     steps:
-      - name: Mod for the tag
+      - name: Mod for the tag or branch
         id: mod
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          echo "slug=${TAG%-v*}" >> "$GITHUB_OUTPUT"
+          # A tag names its mod; a push to release releases Rivalry Core.
+          slug=rivalry-core
+          if [ "$GITHUB_REF_TYPE" = tag ]; then slug="${TAG%-v*}"; fi
+          echo "slug=$slug" >> "$GITHUB_OUTPUT"
           # Tag slug -> mod folder and whether it ships an empty .mod (a code mod without data). Add a line per mod.
-          case "${TAG%-v*}" in
+          case "$slug" in
             rivalry-core) echo "folder=RivalryCore" >> "$GITHUB_OUTPUT"; echo "empty=true" >> "$GITHUB_OUTPUT" ;;
             *) echo "no mod for tag '$TAG'" >&2; exit 1 ;;
           esac
@@ -39,7 +45,7 @@ jobs:
     needs: [mod, release-gate]
     permissions:
       contents: write
-    uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-meitou-mod.yml@2136f4ee8e7c9461d635a3960d10c68d06dde893
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-meitou-mod.yml@29fefc59172e5427e6bbf7ef5ba1741f7fe64daa
     with:
       mod-folder: ${{ needs.mod.outputs.folder }}
       slug: ${{ needs.mod.outputs.slug }}
