@@ -4,6 +4,11 @@
 runs `MeitouClient.exe` from `engine/src/Meitou.Game/bin/Release/<tfm>/` (its `log.txt` is there too). `dotnet run --project Play` does the
 same from a terminal.
 
+## Without an editor
+
+Right-click `tools\Build.ps1` > **Run with PowerShell**. It builds and deploys like `dotnet build` (checking out the submodules first if
+they are missing) and keeps the window open so you can read the result. `-Test` also runs the tests; `-Run` then starts the engine.
+
 ## What a play build does
 
 - Builds `engine/src/Meitou.Game` and each mod in **Release**, whatever the solution configuration: Debug engine builds

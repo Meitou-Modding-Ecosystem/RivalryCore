@@ -52,12 +52,13 @@ public class RivalryCoreTests
     /// A world with one player town and Rivalry Core as its only system.
     /// </summary>
     static (SimWorld World, RivalrySystem System, RivalryOptions Options) Make(PopulationData data, int threads = 1,
-        Action<IRivalryRegistry>? register = null, bool moves = false)
+        Action<IRivalryRegistry>? register = null, bool moves = false, InputStep? step = null)
     {
         var options = new RivalryOptions();
         var system = RivalrySystem.Create(new SystemBuildContext(data, []), options, (RngPurpose)0x80001234u, _ => { }, "test", register);
         var walk = new OpenGroundWalkability((_, _) => 150);
         List<ITickSystem> systems = moves ? [system, new MovementSystem(new PathService(walk, true))] : [system];
+        if (step is not null) systems.Add(step);
         var world = new SimWorld(new WorldSettings { Seed = 3, Threads = threads, PublishSnapshots = false, MinPartitionSize = 1 },
             walk, systems);
         world.Player.Faction = data.FactionIndex("204-gamedata.base");
@@ -715,7 +716,8 @@ public class RivalryCoreTests
     [Fact]
     public void A_redirected_walk_keeps_its_path_until_the_goal_moves_past_the_slack()
     {
-        var (world, _, _) = Make(Data(), moves: true);
+        var step = new InputStep();
+        var (world, _, _) = Make(Data(), moves: true, step: step);
         int faction = world.Player.Faction + 1;
         var hunter = Spawn(world, "Hunter", faction, TownAt, squad: world.Squads.NextId());
         AddSquad(world, faction, hunter);
@@ -723,22 +725,60 @@ public class RivalryCoreTests
         int slot = hunter.Slot;
         var goal = TownAt + new Vector3(500, 0, 0);
 
-        Assert.False(SquadDriver.WalkTo(world, slot, goal, run: true, redirect: true));
-        Assert.Equal((byte)CharacterTask.GoTo, world.Characters.Next[slot].Task);
+        // Behaviours drive squads inside a tick, so each walk is given in the next tick's inputs.
+        bool there = true;
+        step.Run(world, w => there = SquadDriver.WalkTo(w, slot, goal, run: true, redirect: true));
+        Assert.False(there);
+        Assert.Equal((byte)CharacterTask.GoTo, world.Characters.Previous[slot].Task);
         Assert.Equal(TaskType.MoveCusOrdered, world.Characters.Cold(slot)!.Running?.Row);   // a move order: the AI leaves the hunter to it
         Assert.Equal(SpeedMode.Run, world.Characters.Cold(slot)!.RunSpeed);
 
         // Pin the walk's goal to the point; each new move order replaces the queue's front with a new entry.
-        world.Characters.Next[slot].Goal = new Vector2(goal.X, goal.Z);
         var queue = world.Characters.Cold(slot)!.OrderQueue;
         var first = Assert.IsType<OrderEntry>(queue.Front);
 
-        SquadDriver.WalkTo(world, slot, goal + new Vector3(SquadDriver.RedirectSlack / 2, 0, 0), run: true, redirect: true);
+        step.Run(world, w => PinnedWalk(w, slot, goal, goal + new Vector3(SquadDriver.RedirectSlack / 2, 0, 0)));
         Assert.Same(first, queue.Front);      // moved within the slack: the same move
 
-        SquadDriver.WalkTo(world, slot, goal + new Vector3(SquadDriver.RedirectSlack * 3, 0, 0), run: true, redirect: true);
+        step.Run(world, w => PinnedWalk(w, slot, goal, goal + new Vector3(SquadDriver.RedirectSlack * 3, 0, 0)));
         Assert.NotSame(first, queue.Front);   // moved past it: a new move
         Assert.Equal(TaskType.MoveCusOrdered, queue.Front?.Row);
+    }
+
+    /// <summary>
+    /// Pins the walk's goal to <paramref name="pinned"/>, then redirects the walk to <paramref name="to"/>.
+    /// </summary>
+    static void PinnedWalk(World world, int slot, Vector3 pinned, Vector3 to)
+    {
+        world.Characters.Next[slot].Goal = new Vector2(pinned.X, pinned.Z);
+        SquadDriver.WalkTo(world, slot, to, run: true, redirect: true);
+    }
+
+    /// <summary>
+    /// Runs an action in the inputs phase of the next tick, where behaviours give their orders.
+    /// </summary>
+    sealed class InputStep : ITickSystem
+    {
+        /// <summary>
+        /// The action the next tick runs, if any.
+        /// </summary>
+        Action<World>? _action;
+
+        /// <summary>
+        /// Runs <paramref name="action"/> in one tick's inputs.
+        /// </summary>
+        public void Run(SimWorld world, Action<World> action)
+        {
+            _action = action;
+            world.RunTicks(1);
+        }
+
+        public void Inputs(World world, IReadOnlyList<SimCommand> commands)
+        {
+            var action = _action;
+            _action = null;
+            action?.Invoke(world);
+        }
     }
 
     #endregion

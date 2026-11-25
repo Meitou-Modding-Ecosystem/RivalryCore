@@ -21,7 +21,7 @@ jobs:
     if: github.ref == 'refs/heads/beta'
     permissions:
       contents: write
-    uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-meitou-mod.yml@2136f4ee8e7c9461d635a3960d10c68d06dde893
+    uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-meitou-mod.yml@29fefc59172e5427e6bbf7ef5ba1741f7fe64daa
     with:
       mod-folder: RivalryCore
       slug: rivalry-core
