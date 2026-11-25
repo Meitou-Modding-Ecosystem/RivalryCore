@@ -1,8 +1,8 @@
 {
   "id": "rivalry.core",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "apiVersion": 3,
-  "gameVersion": ">=0.23.0",
+  "gameVersion": ">=0.23.1",
   "assemblies": [
     "RivalryCore.dll"
   ],
