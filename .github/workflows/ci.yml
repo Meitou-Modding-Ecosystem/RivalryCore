@@ -15,7 +15,7 @@ permissions:
   contents: read
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: 'true'
+  cancel-in-progress: true
 jobs:
   build:
     uses: TheIvoryDisaster/GutenStructure/.github/workflows/build-dotnet.yml@fc0507fb376b8b8ba732795c7032c9cd81464a58
@@ -39,7 +39,7 @@ jobs:
   package-validation:
     uses: TheIvoryDisaster/GutenStructure/.github/workflows/package-validation.yml@35828a0aa8752f1fc56a9dbdd35b330bf3520ab2
     with:
-      mod-folder: ${{ needs.mod.outputs.folder }}
+      mod-folder: RivalryCore
       empty-data-mod: false
   release-readiness:
     name: Release readiness
