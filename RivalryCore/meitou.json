@@ -2,7 +2,7 @@
   "id": "rivalry.core",
   "version": "0.6.9",
   "apiVersion": 3,
-  "gameVersion": ">=0.24.0",
+  "gameVersion": ">=0.24.1",
   "assemblies": [
     "RivalryCore.dll"
   ],
